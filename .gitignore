@@ -1,0 +1,17 @@
+# 构建产物
+/build/
+
+# 第三方代码（由 tools/fetch_third_party.sh 拉取，版本固定见 third_party/README.md）
+/third_party/
+
+# IDE
+.vscode/
+.idea/
+
+# 杂项
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+compile_commands.json

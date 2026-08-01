@@ -1,0 +1,157 @@
+cmake_minimum_required(VERSION 3.20)
+project(stm32g474-platform VERSION 0.1.0 LANGUAGES C ASM)
+
+if(NOT CMAKE_TOOLCHAIN_FILE)
+  message(FATAL_ERROR "必须通过 -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-arm-none-eabi.cmake 指定交叉工具链")
+endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ---------------------------------------------------------------- 目录
+set(THIRD_PARTY_DIR  ${CMAKE_SOURCE_DIR}/third_party)
+set(CUBE_DIR         ${THIRD_PARTY_DIR}/STM32CubeG4)
+set(HAL_DIR          ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver)
+set(CMSIS_DEV_DIR    ${CUBE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx)
+set(CMSIS_CORE_DIR   ${CUBE_DIR}/Drivers/CMSIS/Include)
+set(FREERTOS_DIR     ${THIRD_PARTY_DIR}/FreeRTOS-Kernel)
+set(FREERTOS_PORT    ${FREERTOS_DIR}/portable/GCC/ARM_CM4F)
+
+# ---------------------------------------------------------------- 公共选项
+set(TARGET_DEFS
+  STM32G474xx
+  USE_HAL_DRIVER
+)
+
+add_compile_options(
+  -ffunction-sections
+  -fdata-sections
+)
+# 统一由下方 add_compile_options 控制优化等级，屏蔽 CMake 默认 Release 标志
+set(CMAKE_C_FLAGS_RELEASE "")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "")
+set(CMAKE_C_FLAGS_DEBUG "")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_options(-Og -g3)
+else()
+  add_compile_options(-O2 -g3)
+endif()
+
+# ================================================================ HAL 库
+add_library(hal STATIC
+  ${HAL_DIR}/Src/stm32g4xx_hal.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_rcc.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_rcc_ex.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_pwr.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_pwr_ex.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_gpio.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_dma.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_cortex.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_flash.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_flash_ex.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_uart.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_uart_ex.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_tim.c
+)
+target_include_directories(hal PUBLIC
+  ${HAL_DIR}/Inc
+  ${CMSIS_DEV_DIR}/Include
+  ${CMSIS_CORE_DIR}
+  ${CMAKE_SOURCE_DIR}/config
+)
+target_compile_definitions(hal PUBLIC ${TARGET_DEFS})
+target_compile_options(hal PRIVATE -w)
+
+# ================================================================ FreeRTOS
+add_library(freertos STATIC
+  ${FREERTOS_DIR}/tasks.c
+  ${FREERTOS_DIR}/queue.c
+  ${FREERTOS_DIR}/list.c
+  ${FREERTOS_DIR}/timers.c
+  ${FREERTOS_DIR}/event_groups.c
+  ${FREERTOS_DIR}/stream_buffer.c
+  ${FREERTOS_PORT}/port.c
+  ${FREERTOS_DIR}/portable/MemMang/heap_4.c
+)
+target_include_directories(freertos PUBLIC
+  ${FREERTOS_DIR}/include
+  ${FREERTOS_PORT}
+  ${CMAKE_SOURCE_DIR}/config
+)
+target_compile_definitions(freertos PUBLIC ${TARGET_DEFS})
+target_compile_options(freertos PRIVATE -w)
+
+# ================================================================ 平台库（bsp + core，业务无关）
+add_library(platform STATIC
+  bsp/board.c
+  bsp/clock.c
+  bsp/led.c
+  bsp/uart.c
+  bsp/msp.c
+  bsp/hal_timebase.c
+  bsp/retarget.c
+  core/osal/osal_freertos.c
+  core/log/log.c
+  core/util/rb.c
+)
+target_include_directories(platform PUBLIC
+  ${CMAKE_SOURCE_DIR}/bsp
+  ${CMAKE_SOURCE_DIR}/core
+  ${CMAKE_SOURCE_DIR}/core/osal
+  ${CMAKE_SOURCE_DIR}/core/log
+  ${CMAKE_SOURCE_DIR}/core/util
+  ${CMAKE_SOURCE_DIR}/core/kernel
+  ${CMAKE_SOURCE_DIR}/config
+)
+target_link_libraries(platform PUBLIC hal freertos)
+target_compile_options(platform PRIVATE -Wall -Wextra)
+
+# ================================================================ 应用
+add_executable(app
+  main.c
+  bsp/startup/startup_stm32g474xx.s
+  bsp/system/system_stm32g4xx.c
+  core/kernel/freertos_hooks.c
+  app/tasks/task_led.c
+  app/tasks/task_sysmon.c
+)
+target_include_directories(app PRIVATE
+  ${CMAKE_SOURCE_DIR}/app
+  ${CMAKE_SOURCE_DIR}/bsp
+  ${CMAKE_SOURCE_DIR}/core
+  ${CMAKE_SOURCE_DIR}/core/osal
+  ${CMAKE_SOURCE_DIR}/core/log
+  ${CMAKE_SOURCE_DIR}/core/util
+  ${CMAKE_SOURCE_DIR}/core/kernel
+  ${CMAKE_SOURCE_DIR}/config
+  ${HAL_DIR}/Inc
+  ${CMSIS_DEV_DIR}/Include
+  ${CMSIS_CORE_DIR}
+  ${FREERTOS_DIR}/include
+  ${FREERTOS_PORT}
+)
+target_link_libraries(app PRIVATE platform)
+target_compile_options(app PRIVATE -Wall -Wextra)
+
+# 应用从 0x08008000 开始（前 32KB 留给 Bootloader），向量表偏移见 docs/flash-partition.md
+target_compile_definitions(app PRIVATE
+  ${TARGET_DEFS}
+  VECT_TAB_OFFSET=0x00008000U
+)
+
+target_link_options(app PRIVATE
+  -T ${CMAKE_SOURCE_DIR}/bsp/linker/stm32g474ret6_app.ld
+  -Wl,--gc-sections
+  -Wl,-Map=${CMAKE_BINARY_DIR}/app.map
+  -Wl,--undefined=_write
+  --specs=nano.specs
+  --specs=nosys.specs
+)
+
+# ---------------------------------------------------------------- 产物
+set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_custom_command(TARGET app POST_BUILD
+  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:app> ${CMAKE_BINARY_DIR}/bin/app.bin
+  COMMAND ${CMAKE_OBJCOPY} -O ihex   $<TARGET_FILE:app> ${CMAKE_BINARY_DIR}/bin/app.hex
+  COMMAND ${CMAKE_SIZE} $<TARGET_FILE:app>
+  COMMENT "生成 app.bin / app.hex"
+)
