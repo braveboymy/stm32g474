@@ -22,6 +22,10 @@ void log_init(log_output_fn out);
 void log_set_level(log_level_t lvl);
 void log_write(log_level_t lvl, const char* tag, const char* fmt, ...);
 
+/* 开启 RAM 镜像：日志同时写入内部环形缓冲（devtool.py log 子命令可读取）。
+ * 用途：无串口通道时用 J-Link 直接读日志（调试闭环）。 */
+void log_enable_ram(void);
+
 #define LOG_D(tag, ...) log_write(LOG_LEVEL_DEBUG, tag, __VA_ARGS__)
 #define LOG_I(tag, ...) log_write(LOG_LEVEL_INFO, tag, __VA_ARGS__)
 #define LOG_W(tag, ...) log_write(LOG_LEVEL_WARN, tag, __VA_ARGS__)

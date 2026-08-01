@@ -51,6 +51,7 @@ add_library(hal STATIC
   ${HAL_DIR}/Src/stm32g4xx_hal_uart.c
   ${HAL_DIR}/Src/stm32g4xx_hal_uart_ex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_tim.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_tim_ex.c
 )
 target_include_directories(hal PUBLIC
   ${HAL_DIR}/Inc
@@ -81,14 +82,13 @@ target_compile_definitions(freertos PUBLIC ${TARGET_DEFS})
 target_compile_options(freertos PRIVATE -w)
 
 # ================================================================ 平台库（bsp + core，业务无关）
+# 注意：覆盖 HAL/库 weak 符号的文件（hal_timebase/msp/retarget/freertos_hooks）
+# 必须编入 app 可执行文件而非静态库，否则静态库链接顺序会导致 weak 实现胜出
 add_library(platform STATIC
   bsp/board.c
   bsp/clock.c
   bsp/led.c
   bsp/uart.c
-  bsp/msp.c
-  bsp/hal_timebase.c
-  bsp/retarget.c
   core/osal/osal_freertos.c
   core/log/log.c
   core/util/rb.c
@@ -105,12 +105,42 @@ target_include_directories(platform PUBLIC
 target_link_libraries(platform PUBLIC hal freertos)
 target_compile_options(platform PRIVATE -Wall -Wextra)
 
+# ================================================================ Bootloader
+# 极简引导（0x08000000，32KB）：校验 app 向量表后跳转，详见 bootloader/main.c
+add_executable(bootloader
+  bootloader/main.c
+  bootloader/startup/startup_stm32g474xx.s
+  bsp/system/system_stm32g4xx.c
+)
+target_include_directories(bootloader PRIVATE
+  ${CMSIS_DEV_DIR}/Include
+  ${CMSIS_CORE_DIR}
+)
+target_compile_definitions(bootloader PRIVATE STM32G474xx)
+target_compile_options(bootloader PRIVATE -Wall -Wextra)
+target_link_options(bootloader PRIVATE
+  -T ${CMAKE_SOURCE_DIR}/bootloader/linker/stm32g474ret6_boot.ld
+  -Wl,--gc-sections
+  -Wl,-Map=${CMAKE_BINARY_DIR}/bootloader.map
+  --specs=nano.specs
+  --specs=nosys.specs
+)
+set_target_properties(bootloader PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_custom_command(TARGET bootloader POST_BUILD
+  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:bootloader> ${CMAKE_BINARY_DIR}/bin/bootloader.bin
+  COMMAND ${CMAKE_OBJCOPY} -O ihex   $<TARGET_FILE:bootloader> ${CMAKE_BINARY_DIR}/bin/bootloader.hex
+  COMMENT "生成 bootloader.bin / bootloader.hex"
+)
+
 # ================================================================ 应用
 add_executable(app
   main.c
   bsp/startup/startup_stm32g474xx.s
   bsp/system/system_stm32g4xx.c
   core/kernel/freertos_hooks.c
+  bsp/hal_timebase.c
+  bsp/msp.c
+  bsp/retarget.c
   app/tasks/task_led.c
   app/tasks/task_sysmon.c
 )

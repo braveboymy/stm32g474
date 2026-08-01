@@ -20,6 +20,7 @@ int main(void)
     bsp_board_init();
 
     log_init(uart_log_output);
+    log_enable_ram();
     LOG_I("sys", "boot start");
 
     if (osal_task_create("led", task_led_entry, NULL, 128, 1) == NULL) {

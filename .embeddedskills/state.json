@@ -1,0 +1,20 @@
+{
+  "last_debug": {
+    "provider": "jlink",
+    "action": "run-to",
+    "device": "STM32G474RE",
+    "interface": "SWD",
+    "speed": "4000",
+    "serial_no": "",
+    "timestamp": "2026-08-01T20:38:09+08:00"
+  },
+  "last_flash": {
+    "provider": "jlink",
+    "action": "flash",
+    "device": "STM32G474RE",
+    "interface": "SWD",
+    "speed": "4000",
+    "serial_no": "",
+    "timestamp": "2026-08-01T20:38:48+08:00"
+  }
+}

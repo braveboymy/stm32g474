@@ -1,0 +1,7 @@
+{
+  "jlink": {
+    "device": "STM32G474RE",
+    "interface": "SWD",
+    "speed": "4000"
+  }
+}

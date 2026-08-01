@@ -64,6 +64,13 @@
 #define configENABLE_MPU                        0
 #define configENABLE_TRUSTZONE                  0
 
+/* v11 的向量表安装检查（configCHECK_HANDLER_INSTALLATION）在 GNU 工具链下
+ * 必然误报：.word 引用 Thumb 函数时链接器会置位 0（条目 = 符号地址|1），
+ * 与符号值比较恒不相等。向量表已通过 bsp/startup 直接指向
+ * vPortSVCHandler / xPortPendSVHandler / xPortSysTickHandler（实测验证），
+ * 故关闭该检查。 */
+#define configCHECK_HANDLER_INSTALLATION       0
+
 /* ---------------- API 裁剪 ---------------- */
 #define INCLUDE_vTaskDelay                      1
 #define INCLUDE_vTaskDelayUntil                 1

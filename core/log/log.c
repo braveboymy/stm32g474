@@ -1,15 +1,20 @@
 #include "log.h"
 #include "osal.h"
+#include "rb.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
 #define LOG_BUF_SIZE 256
+#define LOG_RAM_BUF_SIZE 2048 /* devtool.py 中需与此保持一致 */
 
 static log_output_fn s_out;
 static volatile log_level_t s_level = LOG_LEVEL_INFO;
 static char s_buf[LOG_BUF_SIZE];
+static rb_t s_ram_rb;
+static uint8_t s_ram_buf[LOG_RAM_BUF_SIZE];
+static volatile bool s_ram_enabled;
 
 static char level_char(log_level_t lvl)
 {
@@ -28,6 +33,12 @@ static char level_char(log_level_t lvl)
 void log_init(log_output_fn out)
 {
     s_out = out;
+}
+
+void log_enable_ram(void)
+{
+    rb_init(&s_ram_rb, s_ram_buf, sizeof(s_ram_buf));
+    s_ram_enabled = true;
 }
 
 void log_set_level(log_level_t lvl)
@@ -63,7 +74,12 @@ void log_write(log_level_t lvl, const char* tag, const char* fmt, ...)
         }
         s_buf[n++] = '\r';
         s_buf[n++] = '\n';
-        s_out(s_buf, (uint32_t)n);
+        if (s_out) {
+            s_out(s_buf, (uint32_t)n);
+        }
+        if (s_ram_enabled) {
+            rb_write(&s_ram_rb, (const uint8_t*)s_buf, (uint32_t)n);
+        }
     }
 
     osal_critical_exit(token);

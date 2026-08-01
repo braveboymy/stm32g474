@@ -26,6 +26,7 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority)
     if (HAL_TIM_Base_Start_IT(&s_hal_tim) != HAL_OK) {
         return HAL_ERROR;
     }
+    uwTickPrio = TickPriority; /* 同步 HAL 内部状态（否则 HAL_RCC_ClockConfig 会用初始值 16 触发断言） */
     HAL_NVIC_SetPriority(TIM6_DAC_IRQn, TickPriority, 0);
     HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
     return HAL_OK;

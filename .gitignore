@@ -8,6 +8,10 @@
 .vscode/
 .idea/
 
+# Python 工具（uv）
+.venv/
+__pycache__/
+
 # 杂项
 *.o
 *.elf

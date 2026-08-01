@@ -5,34 +5,27 @@
 ## 快速开始
 
 ```bash
+# 0. 开发工具（uv 管理 Python 环境，零依赖 + pyserial）
+uv sync
+
 # 1. 拉取第三方依赖（FreeRTOS-Kernel V11.1.0 + STM32CubeG4 v1.6.3，约 500MB，一次性）
 tools/fetch_third_party.sh
 
-# 2. 构建（需 arm-none-eabi-gcc ≥ 12、cmake ≥ 3.20、ninja）
-tools/build.sh            # Release（-O2）
-tools/build.sh Debug      # 调试（-Og）
+# 2. 构建
+uv run python tools/devtool.py build [Debug|Release]
 
-# 3. 产物
-build/bin/app.elf         # 含调试信息
-build/bin/app.bin         # 烧录镜像（起始地址 0x08008000）
-build/bin/app.hex
-build/app.map             # 链接映射
-
-# 4. 烧录（NUCLEO-G474RE 板载 ST-LINK）
-openocd -f interface/stlink.cfg -f target/stm32g4x.cfg \
-        -c "program build/bin/app.elf verify reset exit"
-# 或
-st-flash --reset write build/bin/app.bin 0x08008000
+# 3. J-Link 操作（NUCLEO-G474RE，SWD）
+uv run python tools/devtool.py connect   # 连接测试
+uv run python tools/devtool.py flash     # 烧录 bootloader + app（0x08000000 + 0x08008000）
+uv run python tools/devtool.py status    # 读寄存器验证固件运行（TIM6 tick / LED）
+uv run python tools/devtool.py log       # J-Link 读 RAM 日志镜像（无需串口）
+uv run python tools/devtool.py console   # 串口看日志（有 ST-LINK VCP 时）
 ```
 
-串口日志：115200 8N1，经板载 ST-LINK VCP（PC 端 COM 口），格式：
+烧录也可以直接用已安装的 embeddedskills 的 jlink skill：
 
-```
-[      27] I/mon: stm32g474-platform v0.1.0 (xxx)
-[      27] I/mon: SYSCLK=170000000 HCLK=170000000 PCLK1=170000000 PCLK2=170000000
-[      27] I/mon: heap total=49152 free=43664
-[      28] I/led: task started
-[    5028] I/mon: task led       prio=1 state=b stack_hw=...
+```bash
+python ~/.pi/agent/skills/jlink/scripts/jlink_exec.py flash --file build/bin/app.bin --address 0x08008000
 ```
 
 ## 目录结构

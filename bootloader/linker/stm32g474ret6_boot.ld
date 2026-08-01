@@ -1,21 +1,18 @@
 /* ============================================================================
- * STM32G474RET6 应用链接脚本
- * 分区约定见 docs/flash-partition.md：
- *   0x08000000 Bootloader(32KB，预留) / 0x08008000 应用(448KB) / 0x08078000 参数(32KB)
- * 内存：SRAM1 96KB @0x20000000，SRAM2 32KB @0x20018000（电机控制 DMA 缓冲预留）
+ * Bootloader 链接脚本（0x08000000，32KB）
+ * RAM 只用 SRAM1 前 32KB（0x20000000-0x20007FFF）：跳转后由 app 重新初始化
  * ==========================================================================*/
 
 ENTRY(Reset_Handler)
 
-_estack = ORIGIN(RAM) + LENGTH(RAM); /* 主栈顶（MSP），栈大小见 _Min_Stack_Size */
-_Min_Heap_Size = 0x200;
-_Min_Stack_Size = 0x2000; /* 8KB：留给中断嵌套与控制环 ISR */
+_estack = ORIGIN(RAM) + LENGTH(RAM);
+_Min_Heap_Size = 0x100;
+_Min_Stack_Size = 0x800; /* 2KB 足够 bootloader 使用 */
 
 MEMORY
 {
-  FLASH (rx)  : ORIGIN = 0x08008000, LENGTH = 448K
-  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 96K
-  RAM2  (xrw) : ORIGIN = 0x20018000, LENGTH = 32K
+  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 32K
+  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 32K
 }
 
 SECTIONS
@@ -80,8 +77,8 @@ SECTIONS
     PROVIDE_HIDDEN(__fini_array_end = .);
   } >FLASH
 
-  _etext = .;          /* 只读数据结束（.data 加载地址） */
-  _sidata = _etext;    /* startup 文件使用的别名 */
+  _etext = .;
+  _sidata = _etext;
 
   .data :
   {
@@ -107,17 +104,6 @@ SECTIONS
     _ebss = .;
     __bss_end__ = .;
   } >RAM
-
-  /* SRAM2：电机控制高优先级缓冲（电流采样 DMA、CORDIC 数据）预留段 */
-  .sram2 (NOLOAD) :
-  {
-    . = ALIGN(4);
-    __sram2_start__ = .;
-    *(.sram2)
-    *(.sram2*)
-    . = ALIGN(4);
-    __sram2_end__ = .;
-  } >RAM2
 
   ._user_heap_stack :
   {
