@@ -107,5 +107,7 @@ bash tools/check_misra.sh <路径>    # 单目录/文件
 
 ## 6. 提交要求
 
-- 每次提交必须通过：`dev.py build` + `bash tools/check_misra.sh`
+- **pre-commit 钩子已启用**（`tools/githooks/pre-commit`，安装：`bash tools/install_hooks.sh`）：
+  提交前自动执行 `dev.py build` + `bash tools/check_misra.sh`，失败则阻止提交
+- 紧急跳过：`SKIP_CHECKS=1 git commit ...` 或 `git commit --no-verify`（事后必须补跑检查）
 - 硬件行为改动注明验证方式（`dev.py verify` 输出 / RAM 日志证据）

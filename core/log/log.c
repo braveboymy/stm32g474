@@ -48,7 +48,7 @@ void log_set_level(log_level_t lvl)
 
 void log_write(log_level_t lvl, const char* tag, const char* fmt, ...)
 {
-    if (lvl < s_level || s_out == NULL) {
+    if ((lvl < s_level) || (s_out == NULL)) {
         return;
     }
 
@@ -64,8 +64,9 @@ void log_write(log_level_t lvl, const char* tag, const char* fmt, ...)
     if ((size_t)n < sizeof(s_buf)) {
         va_list ap;
         va_start(ap, fmt);
-        n = n + vsnprintf(&s_buf[n], sizeof(s_buf) - (size_t)n, fmt, ap);
+        int written = vsnprintf(&s_buf[n], (sizeof(s_buf) - (size_t)n), fmt, ap);
         va_end(ap);
+        n = n + written;
     }
 
     if (n > 0) {

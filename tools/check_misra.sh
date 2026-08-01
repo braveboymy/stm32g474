@@ -39,7 +39,7 @@ OUT="$("$CPPCHECK" --std=c11 --addon="$ADDON" $INCLUDES $DEFS \
   --suppress=missingIncludeSystem --suppress=misra-config --inline-suppr \
   --enable=warning,style $DIRS 2>&1 || true)"
 
-VIOLATIONS="$(echo "$OUT" | grep -a "misra" | grep -av "use --rule-texts" || true)"
+VIOLATIONS="$(echo "$OUT" | grep -a "misra-c2012-" || true)"
 
 if [ -z "$VIOLATIONS" ]; then
   echo "==> ✅ 无 MISRA 违规"
