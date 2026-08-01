@@ -279,9 +279,12 @@ def cmd_status(args) -> int:
             continue
         alive = len(set(seq)) > 1
         print(f"  {desc:<32}: {['0x%08X' % v for v in seq]} {'运行中' if alive else '无变化'}")
-        ok = ok and alive
+        # 硬指标：TIM6（HAL 时间基准，外设不受 CPU halt 影响）
+        # ODR/LED 在 J-Link halt 时任务暂停，仅作参考不判失败
+        if "TIM6" in desc and not alive:
+            ok = False
     if ok:
-        print("==> 固件运行正常：时间基准与 LED 任务均活跃")
+        print("==> 固件运行正常：时间基准活跃（TIM6 递增）")
         return 0
     print("==> 固件可能未运行或已停机（详见日志）")
     return 1

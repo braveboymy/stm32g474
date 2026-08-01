@@ -28,6 +28,19 @@ uv run python tools/devtool.py console   # 串口看日志（有 ST-LINK VCP 时
 python ~/.pi/agent/skills/jlink/scripts/jlink_exec.py flash --file build/bin/app.bin --address 0x08008000
 ```
 
+## 项目级 Skill（.pi/skills/stm32g474-devtools）
+
+编译/烧录/仿真验证/日志获取已沉淀为项目级 skill，一键闭环：
+
+```bash
+python .pi/skills/stm32g474-devtools/scripts/dev.py verify   # build -> flash -> status -> log
+python .pi/skills/stm32g474-devtools/scripts/dev.py regs     # 卡死时读 CPU 寄存器 + addr2line 定位
+python .pi/skills/stm32g474-devtools/scripts/dev.py log      # J-Link 读 RAM 日志（无串口可用）
+```
+
+排障经验（启动链路坑位、J-Link 注意事项、症状速查）见
+`.pi/skills/stm32g474-devtools/references/troubleshooting.md`。
+
 ## 目录结构
 
 ```
