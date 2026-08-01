@@ -19,3 +19,4 @@ __pycache__/
 *.hex
 *.map
 compile_commands.json
+/.embeddedskills/state.json
