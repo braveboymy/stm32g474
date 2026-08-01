@@ -1,7 +1,7 @@
 # 项目会话总结（第 1 期）
 
 > **本文档用途**：记录本项目的对话历史、关键决策、已解决问题与后续计划。
-> 下次继续对话前先读本文档，可快速恢复上下文。最后更新：2026-08-01。
+> 下次继续对话前先读本文档，可快速恢复上下文。最后更新：2026-08-02。
 
 ## 1. 项目定位与已确认决策
 
@@ -136,6 +136,16 @@ devtool.py verify                  # 一键闭环 build→flash→status→log�
 - 日志：板子无串口通道时用 `dev.py log`（RAM 镜像）；接 ST-LINK VCP 后可用 `dev.py console`
 - 已安装外部 skill：embeddedskills（~/.pi/agent/skills/，jlink/serial/gcc/openocd 等 12 个），jlink skill 已配置 STM32G474RE/SWD/4000
 
+## 5.4 定制板原理图提取（已实测定稿）
+
+- 原理图 `docs/STM32G474R开发板-原理图--202508.pdf` 实测特性：3 页 A4 横向、**无文本层无图片、纯矢量曲线**（每页 3000+ 矢量对象）→ 直接 PDF 文本提取不可行，必须先 PyMuPDF 渲染 PNG（300 DPI，小字局部 600 DPI）再视觉识别
+- 已编写提取规范 `docs/schematic-md-spec.md`（含模板/格式/提取纪律/验收自检清单）
+- **首次验收（2026-08-02）：不合格**。验收方式：RapidOCR 全页 + 局部 600DPI 放大 + PyMuPDF 矢量走线重建，对照规范逐项核验。主要问题：① 产物错误写入 `docs/pinmap.md`（覆盖 NUCLEO 基线，规范要求先写 `hardware-schematic.md`）；② 结构缺章（无器件表/保护电路/差异对照/自检清单）；③ PB12 双重分配冲突（OLED CS vs Flash CS）未解决；④ PB11 误标 NC（实际引出 J5）；⑤ 缺 VREF+/VDDA/F1/D4/排针接口；⑥ "BOOT0 跳线"无图证
+- **二次评审 + 实测定稿（2026-08-02）**：`pinmap.md` 恢复 NUCLEO 基线；`docs/hardware-schematic.md` 按规范模板重写（10 章 + 自检清单 + 差异对照）；万用表实测定稿 6 项——**Flash=SPI3（PC10/11/12 + CS=PA15）、WP 拉高、VREF+/VDDA=3V3（0Ω 已装）、K1/K2=PA0/PA1+GND、J1=Type-C 接口**（此前误作 SPI3 排针，已修正）；另纠错 3V3H=OCR 误读（实为 3V3）
+- **关键发现**：定制板为 DevEBox STM32G474R（8MHz HSE、LED=PC13/PD2、无板载 ST-LINK），与 NUCLEO 差异 10 项——**M1 固件上定制板前必须改 bsp/clock.c（24MHz→8MHz HSE）与 bsp/led.c（PA5→PC13/PD2）**
+- 剩余 ⚠️ 4 项（D4 角色/SPI3 排针位号/RST 位号/Y1 电容）均为实物核对类，不影响固件开发
+- 待办：回填冻结 `docs/pinmap.md`（NUCLEO 段 + 定制板段分节）后三文档一起提交
+
 ## 6. 关键文档索引
 
 | 文档 | 内容 |
@@ -145,5 +155,7 @@ devtool.py verify                  # 一键闭环 build→flash→status→log�
 | docs/flash-partition.md | Flash 分区与 OTA 扩展方案 |
 | docs/pinmap.md | 引脚分配（M1 已占用 + 电机预留） |
 | docs/milestones.md | 里程碑路线 |
+| docs/schematic-md-spec.md | 原理图→MD 编写规范（交大模型提取用，含验收清单） |
+| docs/hardware-schematic.md | （已产出，待二次评审+⚠️实测）定制板原理图硬件参考手册 |
 | .pi/skills/stm32g474-devtools/references/troubleshooting.md | 排错手册（启动链路/症状速查） |
 | tools/cppcheck-addons/misra.json | MISRA 豁免子集 |
