@@ -64,17 +64,19 @@ void log_write(log_level_t lvl, const char* tag, const char* fmt, ...)
     if ((size_t)n < sizeof(s_buf)) {
         va_list ap;
         va_start(ap, fmt);
-        n += vsnprintf(s_buf + n, sizeof(s_buf) - (size_t)n, fmt, ap);
+        n = n + vsnprintf(&s_buf[n], sizeof(s_buf) - (size_t)n, fmt, ap);
         va_end(ap);
     }
 
     if (n > 0) {
-        if ((size_t)n + 2 > sizeof(s_buf)) {
+        if (n > (int)sizeof(s_buf) - 2) {
             n = (int)sizeof(s_buf) - 2;
         }
-        s_buf[n++] = '\r';
-        s_buf[n++] = '\n';
-        if (s_out) {
+        s_buf[n] = '\r';
+        n = n + 1;
+        s_buf[n] = '\n';
+        n = n + 1;
+        if (s_out != NULL) {
             s_out(s_buf, (uint32_t)n);
         }
         if (s_ram_enabled) {

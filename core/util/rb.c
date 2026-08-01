@@ -10,7 +10,7 @@ void rb_init(rb_t* rb, uint8_t* buf, uint32_t size)
 
 static uint32_t rb_mask(const rb_t* rb)
 {
-    return rb->size - 1; /* 调用方保证 size 为 2 的幂 */
+    return rb->size - 1U; /* 调用方保证 size 为 2 的幂 */
 }
 
 uint32_t rb_used(rb_t* rb)
@@ -20,7 +20,7 @@ uint32_t rb_used(rb_t* rb)
 
 uint32_t rb_free(rb_t* rb)
 {
-    return rb->size - 1 - rb_used(rb); /* 留一格以区分空/满 */
+    return rb->size - 1U - rb_used(rb); /* 留一格以区分空/满 */
 }
 
 uint32_t rb_write(rb_t* rb, const uint8_t* data, uint32_t len)
@@ -31,7 +31,7 @@ uint32_t rb_write(rb_t* rb, const uint8_t* data, uint32_t len)
     }
     for (uint32_t i = 0; i < len; i++) {
         rb->buf[rb->head] = data[i];
-        rb->head = (rb->head + 1) & rb_mask(rb);
+        rb->head = (rb->head + 1U) & rb_mask(rb);
     }
     return len;
 }
@@ -44,7 +44,7 @@ uint32_t rb_read(rb_t* rb, uint8_t* data, uint32_t len)
     }
     for (uint32_t i = 0; i < len; i++) {
         data[i] = rb->buf[rb->tail];
-        rb->tail = (rb->tail + 1) & rb_mask(rb);
+        rb->tail = (rb->tail + 1U) & rb_mask(rb);
     }
     return len;
 }
@@ -58,7 +58,7 @@ uint32_t rb_peek(rb_t* rb, uint8_t* data, uint32_t len)
     uint32_t t = rb->tail;
     for (uint32_t i = 0; i < len; i++) {
         data[i] = rb->buf[t];
-        t = (t + 1) & rb_mask(rb);
+        t = (t + 1U) & rb_mask(rb);
     }
     return len;
 }
