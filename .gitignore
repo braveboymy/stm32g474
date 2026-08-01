@@ -20,3 +20,4 @@ __pycache__/
 *.map
 compile_commands.json
 /.embeddedskills/state.json
+*.ctu-info
