@@ -23,6 +23,14 @@
 #define BOARD_BTN_PORT  GPIOC
 #define BOARD_BTN_PIN   GPIO_PIN_13
 
+/* IWDG：LSI≈32kHz，/64 → 512Hz；重载 1536 → 3.0s 超时
+ * 喂狗任务周期 2s（task_wdg），余量 1s；fault_freeze 停机后 3s 兜底复位 */
+/* IWDG：LSI≈32kHz（实测本板 ≈96kHz，约 3 倍标称！），/64 → 标称 500Hz；重载 4095
+ * → 标称 8.2s / 实测 ≈2.7s 超时；喂狗任务周期 1s（task_wdg），余量充足
+ * 注意：本板 LSI 频率异常偏高（约 96kHz），故重载取最大值 4095（保守化配置） */
+#define BOARD_IWDG_PRESCALER IWDG_PRESCALER_64
+#define BOARD_IWDG_RELOAD    4095U
+
 /* 板级初始化：外设上电、时钟、引脚 */
 void bsp_board_init(void);
 

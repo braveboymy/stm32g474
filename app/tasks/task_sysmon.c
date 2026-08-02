@@ -39,7 +39,12 @@ void task_sysmon_entry(void* arg)
           (unsigned long)configTOTAL_HEAP_SIZE, (unsigned long)osal_heap_free());
 
     for (;;) {
-        osal_task_delay_ms(5000);
+        /* 心跳：每 1s 递增（wdg 每 2s 检查，停摆则复位）；5 拍后打印一次状态 */
+        uint32_t i;
+        for (i = 0U; i < 5U; i++) {
+            osal_task_delay_ms(1000U);
+            g_sysmon_beat = g_sysmon_beat + 1U;
+        }
 
         UBaseType_t n = uxTaskGetNumberOfTasks();
         TaskStatus_t* st = pvPortMalloc(sizeof(TaskStatus_t) * n);

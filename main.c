@@ -2,6 +2,7 @@
 #include "task.h"
 
 #include "board.h"
+#include "fault.h"
 #include "log.h"
 #include "osal.h"
 #include "platform.h"
@@ -9,8 +10,8 @@
 #include "uart.h"
 
 /* ============================================================================
- * 应用入口（M1：平台最小系统）
- * 启动顺序：HAL -> 时钟 -> 板级外设 -> 日志 -> 任务 -> 调度器
+ * 应用入口（M2：+ 故障管理/崩溃上报 + 看门狗）
+ * 启动顺序：HAL -> 时钟 -> 板级外设 -> 日志 -> 崩溃上报 -> 任务 -> 调度器
  * ==========================================================================*/
 
 int main(void)
@@ -21,12 +22,16 @@ int main(void)
 
     log_init(uart_log_output);
     log_enable_ram();
+    fault_report_previous(); /* 上次崩溃现场（IWDG 复位后必走此路径） */
     LOG_I("sys", "boot start");
 
-    if (osal_task_create("led", task_led_entry, NULL, 128, 1) == NULL) {
+    if (osal_task_create("led", task_led_entry, NULL, 512, 1) == NULL) {
         Error_Handler();
     }
-    if (osal_task_create("mon", task_sysmon_entry, NULL, 256, 2) == NULL) {
+    if (osal_task_create("mon", task_sysmon_entry, NULL, 1024, 2) == NULL) {
+        Error_Handler();
+    }
+    if (osal_task_create("wdg", task_wdg_entry, NULL, 512, 1) == NULL) {
         Error_Handler();
     }
 
@@ -37,12 +42,9 @@ int main(void)
     }
 }
 
-/* HAL 断言回调（USE_FULL_ASSERT） */
+/* HAL 断言回调（USE_FULL_ASSERT）：登记故障后停机（IWDG 兜底复位） */
 void assert_failed(uint8_t* file, uint32_t line)
 {
     LOG_E("sys", "HAL assert: %s:%lu", (char*)file, (unsigned long)line);
-    __disable_irq();
-    for (;;) {
-        __NOP();
-    }
+    fault_freeze(FAULT_HAL_ASSERT);
 }

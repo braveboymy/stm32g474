@@ -108,6 +108,20 @@ devtool.py verify                  # 一键闭环 build→flash→status→log�
 - ⏳ 未做：串口实测（板载 ST-LINK VCP 未接，无 COM 口；RAM 日志已覆盖验证）
 - 已提交 commits：M1 骨架 → M1 实测修复 → skill 化 → AGENTS.md+MISRA → pre-commit
 
+## 4.5 M2 健壮性（2026-08-02 完成）
+
+- **core/fault 故障管理框架**：现场记录（.noinit SRAM 固定区，跨复位保留）+ 复位后崩溃上报（fault_report_previous）+ fail-fast 停机（IWDG 兜底复位）
+- **HardFault 采集（fault_arm.c）**：EXC_RETURN 选 MSP/PSP、CFSR/HFSR/DFSR/MMFAR/BFAR + 栈帧 r0-r3/r12/lr/pc/xpsr；自测 fault_self_test（UDF 触发）验证闭环：采集→停机→IWDG 复位→上报 ✅（板卡实测）
+- **IWDG 看门狗**：task_wdg 每 1s 喂狗 + sysmon 心跳监控（beat 停摆→故障复位）
+- **故障源接入**：RTOS 断言/栈溢出/malloc 失败/HAL assert/Error_Handler → fault_freeze
+- **排坑记录（本板实测）**：
+  ① HAL_InitTick 的 s_hal_tim.State 在 IWDG/软复位后残留 BUSY → 复位后启动 HardFault（已修：每次 memset + State=RESET）
+  ② **本板 LSI 实测 ≈96kHz（标称 32kHz 的 3 倍）** → IWDG 标称 3s 配置实际仅 ~1s，wdg 首次喂狗（2s）前即被复位 → 复位循环！已修：重载 4095 保守化（标称 8.2s/实测 2.7s）+ 喂狗周期 1s。**换板/量产需实测 LSI**
+  ③ 克隆 J-Link（V9.64）干扰调试（VCATCH 伪崩溃/断点不可靠）→ 改用 J-Link V6.88c（devtool.py 支持 JLINK_VERSION=688 环境变量）
+  ④ log_write 改 RAM 镜像优先（诊断通道不受 uart 后端影响）
+- **M1 遗留问题**：mon 任务表 pvPortMalloc 失败（heap free 充足却 malloc 失败，heap_4 链表疑被踩）→ 任务表一直未打印，记入后续排查
+- 验证：dev.py build + MISRA 0 违规 + 板卡 30s 长稳（led/mon/wdg 正常、无复位）
+
 ## 5. 后续计划
 
 ### 5.1 里程碑路线（docs/milestones.md）

@@ -64,6 +64,16 @@ def find_tool(name: str) -> Path | None:
     hits = [Path(p) for pat in TOOL_PATTERNS.get(name, []) for p in glob.glob(pat)]
     if not hits:
         return None
+
+    # 环境变量 JLINK_VERSION 可指定优先版本（如 JLINK_VERSION=688 选 JLink_V688c，
+    # 用于避开克隆 J-Link 的检测问题；不设置时保持取版本号最大者）
+    pref = os.environ.get("JLINK_VERSION")
+    if pref and name == "JLink.exe":
+        for p in hits:
+            m = re.search(r"V?(\d+(?:\.\d+)*)", p.name)
+            if m and m.group(1).startswith(pref):
+                return p
+
     # 多版本命中时取版本号最大者（如 JLink_V964 > JLink_V688）
     def ver_key(p: Path) -> tuple:
         m = re.search(r"V?(\d+(?:\.\d+)*)", p.name)

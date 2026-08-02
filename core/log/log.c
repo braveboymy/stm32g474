@@ -77,11 +77,12 @@ void log_write(log_level_t lvl, const char* tag, const char* fmt, ...)
         n = n + 1;
         s_buf[n] = '\n';
         n = n + 1;
-        if (s_out != NULL) {
-            s_out(s_buf, (uint32_t)n);
-        }
+        /* RAM 镜像优先：诊断主通道（dev.py log），不受 uart 后端异常影响 */
         if (s_ram_enabled) {
             rb_write(&s_ram_rb, (const uint8_t*)s_buf, (uint32_t)n);
+        }
+        if (s_out != NULL) {
+            s_out(s_buf, (uint32_t)n);
         }
     }
 

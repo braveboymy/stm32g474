@@ -119,6 +119,17 @@ SECTIONS
     __sram2_end__ = .;
   } >RAM2
 
+  /* 故障现场固定区（core/fault）：复位不清除，崩溃信息跨复位保留 */
+  .noinit (NOLOAD) :
+  {
+    . = ALIGN(4);
+    __noinit_start__ = .;
+    *(.noinit)
+    *(.noinit*)
+    . = ALIGN(4);
+    __noinit_end__ = .;
+  } >RAM
+
   ._user_heap_stack :
   {
     . = ALIGN(8);

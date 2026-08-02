@@ -44,6 +44,7 @@ add_library(hal STATIC
   ${HAL_DIR}/Src/stm32g4xx_hal_pwr.c
   ${HAL_DIR}/Src/stm32g4xx_hal_pwr_ex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_gpio.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_iwdg.c
   ${HAL_DIR}/Src/stm32g4xx_hal_dma.c
   ${HAL_DIR}/Src/stm32g4xx_hal_cortex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_flash.c
@@ -87,10 +88,12 @@ target_compile_options(freertos PRIVATE -w)
 add_library(platform STATIC
   bsp/board.c
   bsp/clock.c
+  bsp/iwdg.c
   bsp/led.c
   bsp/uart.c
   core/osal/osal_freertos.c
   core/log/log.c
+  core/fault/fault.c
   core/util/rb.c
 )
 target_include_directories(platform PUBLIC
@@ -98,6 +101,7 @@ target_include_directories(platform PUBLIC
   ${CMAKE_SOURCE_DIR}/core
   ${CMAKE_SOURCE_DIR}/core/osal
   ${CMAKE_SOURCE_DIR}/core/log
+  ${CMAKE_SOURCE_DIR}/core/fault
   ${CMAKE_SOURCE_DIR}/core/util
   ${CMAKE_SOURCE_DIR}/core/kernel
   ${CMAKE_SOURCE_DIR}/config
@@ -138,11 +142,13 @@ add_executable(app
   bsp/startup/startup_stm32g474xx.s
   bsp/system/system_stm32g4xx.c
   core/kernel/freertos_hooks.c
+  core/fault/fault_arm.c
   bsp/hal_timebase.c
   bsp/msp.c
   bsp/retarget.c
   app/tasks/task_led.c
   app/tasks/task_sysmon.c
+  app/tasks/task_wdg.c
 )
 target_include_directories(app PRIVATE
   ${CMAKE_SOURCE_DIR}/app
@@ -150,6 +156,7 @@ target_include_directories(app PRIVATE
   ${CMAKE_SOURCE_DIR}/core
   ${CMAKE_SOURCE_DIR}/core/osal
   ${CMAKE_SOURCE_DIR}/core/log
+  ${CMAKE_SOURCE_DIR}/core/fault
   ${CMAKE_SOURCE_DIR}/core/util
   ${CMAKE_SOURCE_DIR}/core/kernel
   ${CMAKE_SOURCE_DIR}/config

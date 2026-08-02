@@ -3,7 +3,7 @@
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | M1 | 工程骨架：CMake + FreeRTOS + log + UART + LED + sysmon | ✅ 进行中 |
-| M2 | 健壮性：HardFault 现场保存/崩溃报告、看门狗、故障管理框架（core/fault） | ⬜ |
+| M2 | 健壮性：HardFault 现场保存/崩溃报告、看门狗、故障管理框架（core/fault） | ✅ 完成 |
 | M3 | 参数存储（Flash 模拟 EEPROM + 版本/校验/恢复默认）、CLI | ⬜ |
 | M4 | 通信：通用帧协议 + UART/CAN + USB-CDC | ⬜ |
 | M5 | 信号链（电机方向重点）：ADC+HRTIM 同步采样、CORDIC/FMAC 封装、PID、PWM 框架 | ⬜ |
