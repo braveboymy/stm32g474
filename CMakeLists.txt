@@ -25,6 +25,7 @@ set(TARGET_DEFS
 add_compile_options(
   -ffunction-sections
   -fdata-sections
+  -fstack-usage
 )
 # 统一由下方 add_compile_options 控制优化等级，屏蔽 CMake 默认 Release 标志
 set(CMAKE_C_FLAGS_RELEASE "")
@@ -45,6 +46,9 @@ add_library(hal STATIC
   ${HAL_DIR}/Src/stm32g4xx_hal_pwr_ex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_gpio.c
   ${HAL_DIR}/Src/stm32g4xx_hal_iwdg.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_pcd.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_pcd_ex.c
+  ${HAL_DIR}/Src/stm32g4xx_ll_usb.c
   ${HAL_DIR}/Src/stm32g4xx_hal_dma.c
   ${HAL_DIR}/Src/stm32g4xx_hal_cortex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_flash.c
@@ -82,6 +86,24 @@ target_include_directories(freertos PUBLIC
 target_compile_definitions(freertos PUBLIC ${TARGET_DEFS})
 target_compile_options(freertos PRIVATE -w)
 
+
+# ================================================================ USB Device 中间件（第三方，M4 前置）
+set(MW_USB_DIR ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library)
+add_library(usb_mw STATIC
+  ${MW_USB_DIR}/Core/Src/usbd_core.c
+  ${MW_USB_DIR}/Core/Src/usbd_ctlreq.c
+  ${MW_USB_DIR}/Core/Src/usbd_ioreq.c
+  ${MW_USB_DIR}/Class/CDC/Src/usbd_cdc.c
+)
+target_include_directories(usb_mw PUBLIC
+  ${MW_USB_DIR}/Core/Inc
+  ${MW_USB_DIR}/Class/CDC/Inc
+  ${CMAKE_SOURCE_DIR}/config
+)
+target_compile_definitions(usb_mw PUBLIC ${TARGET_DEFS})
+target_compile_options(usb_mw PRIVATE -w)
+target_link_libraries(usb_mw PUBLIC hal)
+
 # ================================================================ 平台库（bsp + core，业务无关）
 # 注意：覆盖 HAL/库 weak 符号的文件（hal_timebase/msp/retarget/freertos_hooks）
 # 必须编入 app 可执行文件而非静态库，否则静态库链接顺序会导致 weak 实现胜出
@@ -103,7 +125,6 @@ target_include_directories(platform PUBLIC
   ${CMAKE_SOURCE_DIR}/core/log
   ${CMAKE_SOURCE_DIR}/core/fault
   ${CMAKE_SOURCE_DIR}/core/util
-  ${CMAKE_SOURCE_DIR}/core/kernel
   ${CMAKE_SOURCE_DIR}/config
 )
 target_link_libraries(platform PUBLIC hal freertos)
@@ -138,15 +159,16 @@ add_custom_command(TARGET bootloader POST_BUILD
 
 # ================================================================ 应用
 add_executable(app
-  main.c
+  app/main.c
   bsp/startup/startup_stm32g474xx.s
   bsp/system/system_stm32g4xx.c
-  core/kernel/freertos_hooks.c
+  core/osal/freertos_hooks.c
   core/fault/fault_arm.c
   bsp/hal_timebase.c
   bsp/msp.c
   bsp/retarget.c
-  app/tasks/task_led.c
+  bsp/usb_cdc.c
+  app/tasks/task_demo.c
   app/tasks/task_sysmon.c
   app/tasks/task_wdg.c
 )
@@ -158,7 +180,6 @@ target_include_directories(app PRIVATE
   ${CMAKE_SOURCE_DIR}/core/log
   ${CMAKE_SOURCE_DIR}/core/fault
   ${CMAKE_SOURCE_DIR}/core/util
-  ${CMAKE_SOURCE_DIR}/core/kernel
   ${CMAKE_SOURCE_DIR}/config
   ${HAL_DIR}/Inc
   ${CMSIS_DEV_DIR}/Include
@@ -166,13 +187,16 @@ target_include_directories(app PRIVATE
   ${FREERTOS_DIR}/include
   ${FREERTOS_PORT}
 )
-target_link_libraries(app PRIVATE platform)
+target_link_libraries(app PRIVATE platform usb_mw)
 target_compile_options(app PRIVATE -Wall -Wextra)
 
 # 应用从 0x08008000 开始（前 32KB 留给 Bootloader），向量表偏移见 docs/flash-partition.md
+# USER_VECT_TAB_ADDRESS：system_stm32g4xx.c（v1.6.3）必须定义此宏才会写 SCB->VTOR
+# （否则 app 向量表留在 0x08000000，仅靠 bootloader 跳转前设置 VTOR 兜底）
 target_compile_definitions(app PRIVATE
   ${TARGET_DEFS}
   VECT_TAB_OFFSET=0x00008000U
+  USER_VECT_TAB_ADDRESS
 )
 
 target_link_options(app PRIVATE

@@ -245,7 +245,8 @@ def cmd_flash(args) -> int:
 
 REG_READS = [
     ("0x40001024", "TIM6 CNT（HAL 时间基准，1kHz 递增）"),
-    ("0x48000014", "GPIOA ODR（LED PA5 位 5）"),
+    ("0x48000814", "GPIOC ODR（LED1 PC13 位 13）"),
+    ("0x48000C14", "GPIOD ODR（LED2 PD2 位 2）"),
 ]
 
 

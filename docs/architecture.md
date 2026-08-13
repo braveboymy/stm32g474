@@ -12,18 +12,45 @@
 ## 2. 分层
 
 ```
-┌─────────────────────────────────────────────┐
-│ app/        业务任务（业务未定，先放平台演示）   │
-├─────────────────────────────────────────────┤
-│ core/       平台核心：osal/log/util/fault(规划)│  ← 硬件无关，PC 可单测
-├─────────────────────────────────────────────┤
-│ bsp/        板级：clock/gpio/uart/led/...     │  ← 换板只改这里
-├─────────────────────────────────────────────┤
-│ hal/        ST HAL（第三方）  freertos/ 内核   │
-└─────────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│ app/        业务层（app/main.c + 业务任务）          │
+├────────────────────────────────────────────────┤
+│ core/       平台核心：osal/log/util/test/fault   │  ← 硬件无关，PC 可单测
+├────────────────────────────────────────────────┤
+│ bsp/        板级：clock/gpio/uart/led/...          │  ← 换板只改这里
+│             + 芯片级 startup/system/linker（见 2.5）│
+├────────────────────────────────────────────────┤
+│ hal/        ST HAL + FreeRTOS 内核（第三方，只读）    │
+└────────────────────────────────────────────────┘
 ```
 
-依赖方向：`app → core → bsp → hal/freertos`，禁止反向。
+依赖方向：`app → core → bsp → hal`，禁止反向。
+hal 是逻辑层名，物理实现位于 `third_party/`（映射见 2.6）。
+
+## 2.5 目录约定与演进决策
+
+- **core/ 只放硬件无关模块**：所有 FreeRTOS 绑定代码集中在 `core/osal/`
+  （`osal_freertos.c` 实现 + `freertos_hooks.c` 钩子），core 其余模块不接触内核
+- **bsp/ 含芯片级文件**（startup/system/linker）：MCU 型号固定（G474RET6）
+  故暂与板级驱动同层；若出现第二 MCU 型号，抽为独立 `platform/` 层
+- **bootloader 与 app 共享 `bsp/system/system_stm32g4xx.c`**（单一副本），
+  M6 OTA 独立演化时保持共享，避免两份维护
+- **应用入口**在 `app/main.c`（启动顺序：HAL → 时钟 → 板级 → 日志 → 任务 → 调度器）
+- **PC 单测落点** `core/test/`（M7 实施）：host 版 osal stub + rb/log 测试
+
+## 2.6 逻辑层 ↔ 物理目录 ↔ 构建目标映射
+
+| 逻辑层 | 物理目录 | CMake 目标 | 说明 |
+|---|---|---|---|
+| app | `app/` | `app`（可执行） | 业务任务 + 应用入口 main.c |
+| core | `core/` | `platform`（静态库） | 硬件无关；FreeRTOS 绑定集中在 core/osal/ |
+| bsp | `bsp/` | `platform`（静态库）+ `app` | weak 覆盖文件（hal_timebase/msp/retarget/usb_cdc）必须编入 app，见 CMake 注释 |
+| hal | `third_party/STM32CubeG4/Drivers/STM32G4xx_HAL_Driver` | `hal`（静态库） | ST HAL，第三方不改不评 |
+| freertos | `third_party/FreeRTOS-Kernel` | `freertos`（静态库） | FreeRTOS V11.1.0，第三方不改不评 |
+| usb 中间件 | `third_party/STM32CubeG4/Middlewares/ST/STM32_USB_Device_Library` | `usb_mw`（静态库） | USB CDC 设备库，第三方不改不评 |
+
+> `third_party/` 由 fetch 脚本拉取、git 忽略、版本锁定（见 README「依赖与版本锁定」）。
+> 业务代码不得直接调用 HAL API，应经 bsp/ 封装访问（如 `SystemClock_GetFreqs`）。
 
 ## 3. 中断优先级约定（Cortex-M4，4 位优先级 0~15）
 

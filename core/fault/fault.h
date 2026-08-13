@@ -34,6 +34,7 @@ typedef enum {
 
 #define FAULT_TASK_NAME_LEN 12U
 #define FAULT_MAGIC         0xF41C7E11UL /* "Fault" */
+#define FAULT_STACK_SNAP_WORDS 32U /* 栈快照 128B：故障点附近栈内容（调用链回溯用） */
 
 /* 崩溃现场记录（固定布局，跨复位保留） */
 typedef struct {
@@ -59,11 +60,17 @@ typedef struct {
     uint32_t bfar;  /* SCB->BFAR */
     uint32_t msp;   /* 现场 MSP/PSP */
     uint32_t psp;
+    uint32_t stack_snap[FAULT_STACK_SNAP_WORDS]; /* 故障栈快照（SP 起 128B，调用链回溯） */
+    uint32_t stack_snap_words;                   /* 实际快照字数（0 = 未采集） */
 } fault_record_t;
 
 /* 登记故障现场（写固定区 + 实时日志）。src 可为栈上临时记录；
  * 任务名与 tick 由本模块自动补齐。可在中断/任务/调度器启动前调用。 */
 void fault_register(const fault_record_t* src);
+
+/* 栈快照采集：从 sp 起拷贝 FAULT_STACK_SNAP_WORDS 字（含 RAM 边界检查）。
+ * 供 fault_arm.c（HardFault 现场）与 fault.c（fault_freeze）共用。 */
+void fault_snap_stack(fault_record_t* r, uint32_t sp);
 
 /* fail-fast 停机：采集当前 PC/LR/SP 登记后关中断死循环（由 IWDG 兜底复位） */
 void fault_freeze(fault_id_t id);

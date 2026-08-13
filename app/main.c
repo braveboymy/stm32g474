@@ -6,7 +6,7 @@
 #include "log.h"
 #include "osal.h"
 #include "platform.h"
-#include "tasks.h"
+#include "tasks/tasks.h"
 #include "uart.h"
 
 /* ============================================================================
@@ -25,7 +25,7 @@ int main(void)
     fault_report_previous(); /* 上次崩溃现场（IWDG 复位后必走此路径） */
     LOG_I("sys", "boot start");
 
-    if (osal_task_create("led", task_led_entry, NULL, 512, 1) == NULL) {
+    if (osal_task_create("demo", task_demo_entry, NULL, 512, 1) == NULL) {
         Error_Handler();
     }
     if (osal_task_create("mon", task_sysmon_entry, NULL, 1024, 2) == NULL) {

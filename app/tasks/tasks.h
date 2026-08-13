@@ -5,7 +5,7 @@
 
 /* 应用任务声明（入口统一为 void (*)(void*) 以适配 OSAL） */
 
-void task_led_entry(void* arg);
+void task_demo_entry(void* arg);
 void task_sysmon_entry(void* arg);
 void task_wdg_entry(void* arg);
 

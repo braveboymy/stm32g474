@@ -64,6 +64,7 @@
 
 | 症状 | 根因 |
 |---|---|
+|---|---|
 | TIM6 CNT=0 且不变 | HAL_InitTick 覆盖未生效（weak 链接顺序）或 uwTickPrio 断言前崩溃 |
 | GPIOA ODR=0xFFFFFFAB 类垃圾值 | core 异常（lockup/HardFault）时的总线读 |
 | `T-bit of XPSR is 0` 警告 | 复位后 core 未正常执行（向量表问题） |

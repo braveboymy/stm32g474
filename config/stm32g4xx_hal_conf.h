@@ -33,44 +33,46 @@ extern "C" {
 /**
   * @brief This is the list of modules to be used in the HAL driver
   */
+/* 使能集 = CMake 实际编译的 HAL 源文件 + 业务已使用模块（配置必须与 CMakeLists 一致）。
+ * 注释集 = 未编译/未使用（M3/M5/M6 启用时：注释掉行首并同步在 CMakeLists 增加对应 Src）。 */
 #define HAL_MODULE_ENABLED
-#define HAL_ADC_MODULE_ENABLED
-#define HAL_COMP_MODULE_ENABLED
-#define HAL_CORDIC_MODULE_ENABLED
-#define HAL_CORTEX_MODULE_ENABLED
-#define HAL_CRC_MODULE_ENABLED
-#define HAL_CRYP_MODULE_ENABLED
-#define HAL_DAC_MODULE_ENABLED
-#define HAL_DMA_MODULE_ENABLED
-#define HAL_EXTI_MODULE_ENABLED
-#define HAL_FDCAN_MODULE_ENABLED
-#define HAL_FLASH_MODULE_ENABLED
-#define HAL_FMAC_MODULE_ENABLED
 #define HAL_GPIO_MODULE_ENABLED
-#define HAL_HRTIM_MODULE_ENABLED
-#define HAL_IRDA_MODULE_ENABLED
-#define HAL_IWDG_MODULE_ENABLED
-#define HAL_I2C_MODULE_ENABLED
-#define HAL_I2S_MODULE_ENABLED
-#define HAL_LPTIM_MODULE_ENABLED
-#define HAL_NAND_MODULE_ENABLED
-#define HAL_NOR_MODULE_ENABLED
-#define HAL_OPAMP_MODULE_ENABLED
-#define HAL_PCD_MODULE_ENABLED
-#define HAL_PWR_MODULE_ENABLED
-#define HAL_QSPI_MODULE_ENABLED
+#define HAL_DMA_MODULE_ENABLED
 #define HAL_RCC_MODULE_ENABLED
-#define HAL_RNG_MODULE_ENABLED
-#define HAL_RTC_MODULE_ENABLED
-#define HAL_SAI_MODULE_ENABLED
-#define HAL_SMARTCARD_MODULE_ENABLED
-#define HAL_SMBUS_MODULE_ENABLED
-#define HAL_SPI_MODULE_ENABLED
-#define HAL_SRAM_MODULE_ENABLED
-#define HAL_TIM_MODULE_ENABLED
+#define HAL_FLASH_MODULE_ENABLED
+#define HAL_PWR_MODULE_ENABLED
+#define HAL_CORTEX_MODULE_ENABLED
 #define HAL_UART_MODULE_ENABLED
-#define HAL_USART_MODULE_ENABLED
-#define HAL_WWDG_MODULE_ENABLED
+#define HAL_TIM_MODULE_ENABLED      /* TIM6 时间基准（bsp/hal_timebase.c）+ M5 PWM */
+#define HAL_IWDG_MODULE_ENABLED     /* 独立看门狗（M2 故障框架回归时用） */
+#define HAL_PCD_MODULE_ENABLED      /* USB Device（bsp/usb_cdc.c） */
+/*#define HAL_ADC_MODULE_ENABLED   */  /* M5 三相电流采样 */
+/*#define HAL_COMP_MODULE_ENABLED  */  /* M5 硬件保护（COMP→PWM 刹车） */
+/*#define HAL_CORDIC_MODULE_ENABLED*/  /* M5 CORDIC 封装 */
+/*#define HAL_CRC_MODULE_ENABLED   */  /* M6 OTA 镜像校验 */
+/*#define HAL_DAC_MODULE_ENABLED   */  /* M5 模拟输出 */
+/*#define HAL_FDCAN_MODULE_ENABLED */  /* M4 通信（FDCAN2/3） */
+/*#define HAL_FMAC_MODULE_ENABLED  */  /* M5 滤波器 */
+/*#define HAL_HRTIM_MODULE_ENABLED */  /* M5 高分辨率 PWM */
+/*#define HAL_OPAMP_MODULE_ENABLED */  /* M5 电流采样运放 */
+/*#define HAL_SPI_MODULE_ENABLED   */  /* M3 参数存储（W25Q16）/ OLED */
+/*#define HAL_EXTI_MODULE_ENABLED  */  /* M4 CLI 按键（启用时同步加 hal_exti.c） */
+/*#define HAL_CRYP_MODULE_ENABLED  */
+/*#define HAL_I2C_MODULE_ENABLED   */
+/*#define HAL_I2S_MODULE_ENABLED   */
+/*#define HAL_IRDA_MODULE_ENABLED  */
+/*#define HAL_LPTIM_MODULE_ENABLED */
+/*#define HAL_NAND_MODULE_ENABLED  */
+/*#define HAL_NOR_MODULE_ENABLED   */
+/*#define HAL_QSPI_MODULE_ENABLED  */
+/*#define HAL_RNG_MODULE_ENABLED   */
+/*#define HAL_RTC_MODULE_ENABLED   */
+/*#define HAL_SAI_MODULE_ENABLED   */
+/*#define HAL_SMARTCARD_MODULE_ENABLED*/
+/*#define HAL_SMBUS_MODULE_ENABLED */
+/*#define HAL_SRAM_MODULE_ENABLED  */
+/*#define HAL_USART_MODULE_ENABLED */
+/*#define HAL_WWDG_MODULE_ENABLED  */
 
 /* ########################## Register Callbacks selection ############################## */
 /**
@@ -114,11 +116,11 @@ extern "C" {
   *        (when HSE is used as system clock source, directly or through the PLL).
   */
 #if !defined  (HSE_VALUE)
-#define HSE_VALUE    (24000000UL) /* NUCLEO-G474RE 板载 24MHz 晶振 */ /*!< Value of the External oscillator in Hz */
+#define HSE_VALUE    (8000000UL)  /* DevEBox 定制板 8MHz 晶振（NUCLEO 为 24MHz） */ /*!< Value of the External oscillator in Hz */
 #endif /* HSE_VALUE */
 
 #if !defined  (HSE_STARTUP_TIMEOUT)
-#define HSE_STARTUP_TIMEOUT    (100UL)   /*!< Time out for HSE start up, in ms */
+#define HSE_STARTUP_TIMEOUT    (1000UL)  /*!< Time out for HSE start up, in ms（定制板实测放宽） */
 #endif /* HSE_STARTUP_TIMEOUT */
 
 /**

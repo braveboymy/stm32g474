@@ -57,8 +57,9 @@ static void tx_start_locked(void)
         if (HAL_UART_Transmit_IT(&s_uart, &s_tx_byte, 1) == HAL_OK) {
             s_tx_busy = true;
         } else {
-            /* 理论不可达（busy 标志与 HAL 状态一致），保持不推进 tail，下次重试 */
-            s_tx_busy = true;
+            /* HAL 非 READY（BUSY/ERROR）：字节仍在缓冲（peek 未推进 tail），
+             * 不置 busy，由下次 uart_write 重试；BUSY 场景下 TxCplt 回调会接手 */
+            s_tx_busy = false;
         }
     } else {
         s_tx_busy = false;

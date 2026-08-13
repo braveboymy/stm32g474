@@ -32,16 +32,22 @@ void task_sysmon_entry(void* arg)
     (void)arg;
 
     LOG_I("mon", "%s v%s (%s %s)", PLATFORM_NAME, PLATFORM_VERSION, __DATE__, __TIME__);
+
+    uint32_t sys_freq = 0U;
+    uint32_t hclk_freq = 0U;
+    uint32_t pclk1_freq = 0U;
+    uint32_t pclk2_freq = 0U;
+    SystemClock_GetFreqs(&sys_freq, &hclk_freq, &pclk1_freq, &pclk2_freq);
     LOG_I("mon", "SYSCLK=%lu HCLK=%lu PCLK1=%lu PCLK2=%lu",
-          (unsigned long)HAL_RCC_GetSysClockFreq(), (unsigned long)HAL_RCC_GetHCLKFreq(),
-          (unsigned long)HAL_RCC_GetPCLK1Freq(), (unsigned long)HAL_RCC_GetPCLK2Freq());
+          (unsigned long)sys_freq, (unsigned long)hclk_freq,
+          (unsigned long)pclk1_freq, (unsigned long)pclk2_freq);
     LOG_I("mon", "heap total=%lu free=%lu",
           (unsigned long)configTOTAL_HEAP_SIZE, (unsigned long)osal_heap_free());
 
     for (;;) {
-        /* 心跳：每 1s 递增（wdg 每 2s 检查，停摆则复位）；5 拍后打印一次状态 */
-        uint32_t i;
-        for (i = 0U; i < 5U; i++) {
+        /* 心跳：每 1s 递增（task_wdg 每 2s 检查，停摆则故障复位）；5 拍后打印一次状态 */
+        uint32_t beat;
+        for (beat = 0U; beat < 5U; beat++) {
             osal_task_delay_ms(1000U);
             g_sysmon_beat = g_sysmon_beat + 1U;
         }

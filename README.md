@@ -44,17 +44,19 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py log      # J-Link 读 RAM �
 ## 目录结构
 
 ```
-├── app/            # 业务层（业务任务，业务未定时只放平台演示任务）
+├── app/            # 业务层（应用入口 main.c + 业务任务）
+│   └── tasks/      # 业务任务（task_demo / task_sysmon）与任务声明 tasks.h
 ├── bsp/            # 板级支持：board / clock / led / uart / msp / timebase
 │   ├── startup/    # 启动文件（从 CMSIS 模板复制，项目所有）
 │   ├── system/     # system_stm32g4xx.c（VECT_TAB_OFFSET=0x8000）
 │   └── linker/     # 应用链接脚本（分区见 docs/flash-partition.md）
 ├── core/           # 平台核心（硬件无关，可移植，重点投入）
-│   ├── osal/       # OS 抽象层（业务只依赖此接口）
-│   ├── kernel/     # FreeRTOS 钩子（栈溢出/断言/内存失败）
+│   ├── osal/       # OS 抽象层 + FreeRTOS 集成（业务只依赖 osal.h）
+│   ├── fault/      # 故障管理：现场采集/栈回溯/复位上报（M2）
 │   ├── log/        # 分级日志（临界区保护，任务/中断均可用）
-│   └── util/       # 环形缓冲等通用组件
-├── config/         # FreeRTOSConfig.h / stm32g4xx_hal_conf.h / platform.h
+│   ├── util/       # 环形缓冲等通用组件
+│   └── test/       # PC 端 host 单测落点（M7 实施，见 test/README.md）
+├── config/         # FreeRTOSConfig.h / stm32g4xx_hal_conf.h / platform.h / usbd_conf.h
 ├── docs/           # 架构 / 分区 / 引脚 / 里程碑
 ├── tools/          # 构建与第三方依赖脚本
 └── third_party/    # git 忽略，由 fetch_third_party.sh 拉取（版本锁定）

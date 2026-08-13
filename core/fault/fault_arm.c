@@ -39,6 +39,8 @@ void HardFault_Handler(void)
     rec.sp = sp;
     rec.msp = msp;
     rec.psp = psp;
+    /* 栈快照：故障发生栈的 SP 起 128B（调用链回溯，M2 扩展） */
+    fault_snap_stack(&rec, sp);
     rec.cfsr = SCB->CFSR;
     rec.hfsr = SCB->HFSR;
     rec.dfsr = SCB->DFSR;
