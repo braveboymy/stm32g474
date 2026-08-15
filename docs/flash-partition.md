@@ -16,10 +16,11 @@ STM32G474RET6：Flash 512KB（双 Bank，每 Bank 32 × 8KB 扇区），起始 0
 - 向量表偏移：`VECT_TAB_OFFSET=0x00008000U`（CMake 编译定义，system_stm32g4xx.c 使用）
 - 烧录：app.bin 必须烧到 0x08008000（openocd 用 elf 自动定位；st-flash 需显式地址）
 
-## OTA 扩展方案（M6 再细化，布局已兼容）
+## OTA 扩展方案（已定：外挂 SPI Flash 暂存，见 ADR-0001）
 
-- 方案 A（简单）：Bootloader + 单应用 + 参数区，整包校验后覆盖升级，异常回退到 Bootloader 等待重刷
-- 方案 B（A/B）：双 Bank 交替升级。当前布局中 Bootloader 32KB + 应用 448KB + 参数 32KB 已按"应用可用双 Bank 对半拆"预留（Bank1 尾部 + Bank2 可拆为两个 224KB 槽位），届时只调整链接脚本
+- **方案 C（选定）**：外挂 SPI Flash（≥1MB）暂存新固件 + 单 bank 校验升级。片内分区零改动：下载到 SPI Flash → 校验 → 标记待升级 → 复位进 bootloader → 复制到 app bank → 启动校验，失败从 SPI Flash 上一版本镜像回滚
+- **方案 B（否决-可复议）**：双 Bank A/B 交替。当前布局可拆 224K+224K 槽位，但需 DBANK option byte + bootloader 重构；若未来 app 逼近 224KB 或需零停机升级，可 supersede ADR-0001 重新评估
+- **外挂 SPI Flash 布局（预留）**：暂存区 448KB / 上一版本镜像 448KB / 元信息区（容量 ≥1MB 的 SPI NOR，如 W25Q 系列）
 - 传输通道：UART-YModem / CAN / USB（M6 定）
 
 ## 注意事项
