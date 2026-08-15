@@ -97,7 +97,7 @@ def main() -> int:
         return 1
 
     # 透传子命令：第一个参数是命令名，其余参数原样转给 tools/devtool.py
-    passthrough = ("info", "build", "flash", "connect", "status", "log", "console")
+    passthrough = ("info", "build", "flash", "connect", "status", "log", "console", "test")
     if sys.argv[1] in passthrough:
         return devtool_run([sys.argv[1]] + sys.argv[2:])
 
