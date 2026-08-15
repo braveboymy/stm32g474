@@ -55,8 +55,12 @@ void log_write(log_level_t lvl, const char* tag, const char* fmt, ...)
     /* 临界区：串行化多任务输出，并保护共享缓冲不被中断抢占 */
     uint32_t token = osal_critical_enter();
 
-    int n = snprintf(s_buf, sizeof(s_buf), "[%08lu] %c/%s(%s): ",
-                     (unsigned long)osal_tick_ms(), level_char(lvl), tag,
+    int n = snprintf(s_buf,
+                     sizeof(s_buf),
+                     "[%08lu] %c/%s(%s): ",
+                     (unsigned long)osal_tick_ms(),
+                     level_char(lvl),
+                     tag,
                      osal_scheduler_running() ? osal_task_current_name() : "boot");
     if (n < 0) {
         n = 0;

@@ -38,11 +38,13 @@ void task_sysmon_entry(void* arg)
     uint32_t pclk1_freq = 0U;
     uint32_t pclk2_freq = 0U;
     SystemClock_GetFreqs(&sys_freq, &hclk_freq, &pclk1_freq, &pclk2_freq);
-    LOG_I("mon", "SYSCLK=%lu HCLK=%lu PCLK1=%lu PCLK2=%lu",
-          (unsigned long)sys_freq, (unsigned long)hclk_freq,
-          (unsigned long)pclk1_freq, (unsigned long)pclk2_freq);
-    LOG_I("mon", "heap total=%lu free=%lu",
-          (unsigned long)configTOTAL_HEAP_SIZE, (unsigned long)osal_heap_free());
+    LOG_I("mon",
+          "SYSCLK=%lu HCLK=%lu PCLK1=%lu PCLK2=%lu",
+          (unsigned long)sys_freq,
+          (unsigned long)hclk_freq,
+          (unsigned long)pclk1_freq,
+          (unsigned long)pclk2_freq);
+    LOG_I("mon", "heap total=%lu free=%lu", (unsigned long)configTOTAL_HEAP_SIZE, (unsigned long)osal_heap_free());
 
     for (;;) {
         /* 心跳：每 1s 递增（task_wdg 每 2s 检查，停摆则故障复位）；5 拍后打印一次状态 */
@@ -58,8 +60,10 @@ void task_sysmon_entry(void* arg)
             UBaseType_t total = 0;
             if (uxTaskGetSystemState(st, n, &total) == pdPASS) {
                 for (UBaseType_t i = 0; i < total; i++) {
-                    LOG_I("mon", "task %-10s prio=%u state=%c stack_hw=%lu",
-                          st[i].pcTaskName, (unsigned)st[i].uxCurrentPriority,
+                    LOG_I("mon",
+                          "task %-10s prio=%u state=%c stack_hw=%lu",
+                          st[i].pcTaskName,
+                          (unsigned)st[i].uxCurrentPriority,
                           state_char(st[i].eCurrentState),
                           (unsigned long)st[i].usStackHighWaterMark);
                 }

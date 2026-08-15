@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-commit 钩子：提交前自动执行 编译 + MISRA C:2012 检查
+# pre-commit 钩子：提交前自动执行 编译 + MISRA C:2012 + clang-format 格式检查
 # 安装：bash tools/install_hooks.sh（设置 git core.hooksPath）
 # 跳过（紧急提交）：SKIP_CHECKS=1 git commit ... 或 git commit --no-verify
 set -uo pipefail
@@ -8,7 +8,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 if [ "${SKIP_CHECKS:-0}" = "1" ]; then
-  echo "==> [pre-commit] SKIP_CHECKS=1，跳过编译与 MISRA 检查"
+  echo "==> [pre-commit] SKIP_CHECKS=1，跳过编译/MISRA/格式检查"
   exit 0
 fi
 
@@ -32,6 +32,30 @@ else
   echo "    ❌ MISRA 违规："
   tail -20 /tmp/precommit_misra.log | sed 's/^/      /'
   FAILED=1
+fi
+
+echo "==> [pre-commit] clang-format 格式检查（仅改动文件）"
+if command -v clang-format > /dev/null 2>&1; then
+  # 收集本次改动的 C/H 文件（已暂存 + 未暂存）
+  FILES=$(git diff --cached --name-only --diff-filter=ACM '*.c' '*.h' 2>/dev/null; \
+          git diff --name-only --diff-filter=ACM '*.c' '*.h' 2>/dev/null)
+  # 排除第三方/生成代码
+  FILES=$(echo "$FILES" | grep -vE "bsp/system/|bsp/startup/|bsp/linker/" || true)
+  FMT_FAIL=0
+  for f in $FILES; do
+    [ -f "$f" ] || continue
+    if ! clang-format --style=file --dry-run --Werror "$f" > /dev/null 2>&1; then
+      echo "    ❌ 格式不符: $f（运行 clang-format -i $f）"
+      FMT_FAIL=1
+    fi
+  done
+  if [ "$FMT_FAIL" -eq 0 ]; then
+    echo "    ✅ 格式合规"
+  else
+    FAILED=1
+  fi
+else
+  echo "    ⚠️ 未安装 clang-format（pip install clang-format），跳过格式检查"
 fi
 
 if [ "$FAILED" -ne 0 ]; then

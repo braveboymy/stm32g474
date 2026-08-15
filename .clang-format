@@ -1,6 +1,36 @@
+# STM32G474 平台 clang-format 配置
+# 依据: docs/coding_standard.md 第 2 章
+# 用法: clang-format -i <file>   检查: clang-format --dry-run --Werror <file>
+
 BasedOnStyle: LLVM
+
+# ---- 缩进与排版（项目现状：4 空格 / 120 列）----
 IndentWidth: 4
-ContinuationIndentWidth: 4
+UseTab: Never
+TabWidth: 4
 ColumnLimit: 120
+ContinuationIndentWidth: 4
+
+# ---- 大括号：函数独立行（Allman），控制语句同行（K&R）----
+BreakBeforeBraces: Linux
+
+# ---- 指针/引用：星号靠类型（项目现状 Type* p）----
 PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+# ---- 空格与运算符 ----
+SpaceBeforeParens: ControlStatements   # if (...) 有空格, 函数调用 f(...) 无空格
+SpaceAfterCStyleCast: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceBeforeSquareBrackets: false
+
+# ---- 函数与语句 ----
+BinPackArguments: false                # 函数参数换行时一个一行
+BinPackParameters: false
+BreakBeforeBinaryOperators: NonAssignment   # 二元运算符换行时放行首
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
 SortIncludes: Never

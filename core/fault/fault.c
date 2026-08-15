@@ -21,19 +21,17 @@ static fault_record_t s_record __attribute__((section(".noinit"), aligned(4)));
 /* 防重入：登记过程中再次故障（如日志输出故障）直接放弃，避免递归 */
 static volatile uint32_t s_registering;
 
-static const char* const s_id_names[FAULT_ID_COUNT] = {
-    "none",
-    "hardfault",
-    "memmanage",
-    "busfault",
-    "usagefault",
-    "rtos-assert",
-    "stack-overflow",
-    "malloc-failed",
-    "hal-assert",
-    "error-handler",
-    "sysmon-stall"
-};
+static const char* const s_id_names[FAULT_ID_COUNT] = {"none",
+                                                       "hardfault",
+                                                       "memmanage",
+                                                       "busfault",
+                                                       "usagefault",
+                                                       "rtos-assert",
+                                                       "stack-overflow",
+                                                       "malloc-failed",
+                                                       "hal-assert",
+                                                       "error-handler",
+                                                       "sysmon-stall"};
 
 /* 栈快照采集：从 sp 起拷贝 FAULT_STACK_SNAP_WORDS 字（含边界检查，RAM 外清零） */
 void fault_snap_stack(fault_record_t* r, uint32_t sp)
@@ -104,20 +102,34 @@ void fault_register(const fault_record_t* src)
 
     /* 实时日志（尽力而为：log 未初始化/输出失败时静默） */
     const fault_record_t* const r = &s_record;
-    LOG_E("fault", "crash id=%lu(%s) seq=%lu tick=%lu task=%s",
-          (unsigned long)r->id, fault_id_name((fault_id_t)r->id),
-          (unsigned long)r->seq, (unsigned long)r->tick_ms, r->task);
-    LOG_E("fault", "  pc=0x%08lx lr=0x%08lx xpsr=0x%08lx sp=0x%08lx",
-          (unsigned long)r->pc, (unsigned long)r->lr, (unsigned long)r->xpsr,
+    LOG_E("fault",
+          "crash id=%lu(%s) seq=%lu tick=%lu task=%s",
+          (unsigned long)r->id,
+          fault_id_name((fault_id_t)r->id),
+          (unsigned long)r->seq,
+          (unsigned long)r->tick_ms,
+          r->task);
+    LOG_E("fault",
+          "  pc=0x%08lx lr=0x%08lx xpsr=0x%08lx sp=0x%08lx",
+          (unsigned long)r->pc,
+          (unsigned long)r->lr,
+          (unsigned long)r->xpsr,
           (unsigned long)r->sp);
-    LOG_E("fault", "  r0=0x%08lx r1=0x%08lx r2=0x%08lx r3=0x%08lx r12=0x%08lx",
-          (unsigned long)r->r0, (unsigned long)r->r1, (unsigned long)r->r2,
-          (unsigned long)r->r3, (unsigned long)r->r12);
-    LOG_E("fault", "  cfsr=0x%08lx hfsr=0x%08lx dfsr=0x%08lx mmfar=0x%08lx bfar=0x%08lx",
-          (unsigned long)r->cfsr, (unsigned long)r->hfsr, (unsigned long)r->dfsr,
-          (unsigned long)r->mmfar, (unsigned long)r->bfar);
-    LOG_E("fault", "  msp=0x%08lx psp=0x%08lx",
-          (unsigned long)r->msp, (unsigned long)r->psp);
+    LOG_E("fault",
+          "  r0=0x%08lx r1=0x%08lx r2=0x%08lx r3=0x%08lx r12=0x%08lx",
+          (unsigned long)r->r0,
+          (unsigned long)r->r1,
+          (unsigned long)r->r2,
+          (unsigned long)r->r3,
+          (unsigned long)r->r12);
+    LOG_E("fault",
+          "  cfsr=0x%08lx hfsr=0x%08lx dfsr=0x%08lx mmfar=0x%08lx bfar=0x%08lx",
+          (unsigned long)r->cfsr,
+          (unsigned long)r->hfsr,
+          (unsigned long)r->dfsr,
+          (unsigned long)r->mmfar,
+          (unsigned long)r->bfar);
+    LOG_E("fault", "  msp=0x%08lx psp=0x%08lx", (unsigned long)r->msp, (unsigned long)r->psp);
 
     s_registering = 0U;
 }
@@ -185,20 +197,33 @@ bool fault_report_previous(void)
 
     const fault_record_t* const r = &s_record;
     LOG_E("fault", "=== previous crash (seq=%lu) ===", (unsigned long)r->seq);
-    LOG_E("fault", "  id=%lu(%s) tick=%lu task=%s",
-          (unsigned long)r->id, fault_id_name((fault_id_t)r->id),
-          (unsigned long)r->tick_ms, r->task);
-    LOG_E("fault", "  pc=0x%08lx lr=0x%08lx xpsr=0x%08lx sp=0x%08lx",
-          (unsigned long)r->pc, (unsigned long)r->lr, (unsigned long)r->xpsr,
+    LOG_E("fault",
+          "  id=%lu(%s) tick=%lu task=%s",
+          (unsigned long)r->id,
+          fault_id_name((fault_id_t)r->id),
+          (unsigned long)r->tick_ms,
+          r->task);
+    LOG_E("fault",
+          "  pc=0x%08lx lr=0x%08lx xpsr=0x%08lx sp=0x%08lx",
+          (unsigned long)r->pc,
+          (unsigned long)r->lr,
+          (unsigned long)r->xpsr,
           (unsigned long)r->sp);
-    LOG_E("fault", "  r0=0x%08lx r1=0x%08lx r2=0x%08lx r3=0x%08lx r12=0x%08lx",
-          (unsigned long)r->r0, (unsigned long)r->r1, (unsigned long)r->r2,
-          (unsigned long)r->r3, (unsigned long)r->r12);
-    LOG_E("fault", "  cfsr=0x%08lx hfsr=0x%08lx dfsr=0x%08lx mmfar=0x%08lx bfar=0x%08lx",
-          (unsigned long)r->cfsr, (unsigned long)r->hfsr, (unsigned long)r->dfsr,
-          (unsigned long)r->mmfar, (unsigned long)r->bfar);
-    LOG_E("fault", "  msp=0x%08lx psp=0x%08lx",
-          (unsigned long)r->msp, (unsigned long)r->psp);
+    LOG_E("fault",
+          "  r0=0x%08lx r1=0x%08lx r2=0x%08lx r3=0x%08lx r12=0x%08lx",
+          (unsigned long)r->r0,
+          (unsigned long)r->r1,
+          (unsigned long)r->r2,
+          (unsigned long)r->r3,
+          (unsigned long)r->r12);
+    LOG_E("fault",
+          "  cfsr=0x%08lx hfsr=0x%08lx dfsr=0x%08lx mmfar=0x%08lx bfar=0x%08lx",
+          (unsigned long)r->cfsr,
+          (unsigned long)r->hfsr,
+          (unsigned long)r->dfsr,
+          (unsigned long)r->mmfar,
+          (unsigned long)r->bfar);
+    LOG_E("fault", "  msp=0x%08lx psp=0x%08lx", (unsigned long)r->msp, (unsigned long)r->psp);
     fault_print_call_chain(r);
     LOG_E("fault", "=== end crash report ===");
 

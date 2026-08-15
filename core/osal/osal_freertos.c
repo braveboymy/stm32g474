@@ -8,8 +8,8 @@
  * OSAL 的 FreeRTOS 实现
  * ==========================================================================*/
 
-osal_task_t osal_task_create(const char* name, void (*entry)(void* arg), void* arg,
-                             uint32_t stack_words, uint32_t priority)
+osal_task_t
+osal_task_create(const char* name, void (*entry)(void* arg), void* arg, uint32_t stack_words, uint32_t priority)
 {
     TaskHandle_t h = NULL;
     if (xTaskCreate((TaskFunction_t)entry, name, stack_words, arg, priority, &h) != pdPASS) {

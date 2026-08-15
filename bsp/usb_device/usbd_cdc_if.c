@@ -80,12 +80,7 @@ static int8_t CDC_TransmitCplt_FS(uint8_t* Buf, uint32_t* Len, uint8_t epnum)
 }
 
 USBD_CDC_ItfTypeDef USBD_Interface_fops_FS = {
-    CDC_Init_FS,
-    CDC_DeInit_FS,
-    CDC_Control_FS,
-    CDC_Receive_FS,
-    CDC_TransmitCplt_FS
-};
+    CDC_Init_FS, CDC_DeInit_FS, CDC_Control_FS, CDC_Receive_FS, CDC_TransmitCplt_FS};
 
 /* ---------------- 标准发送入口 ---------------- */
 

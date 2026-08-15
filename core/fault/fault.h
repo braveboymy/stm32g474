@@ -33,7 +33,7 @@ typedef enum {
 } fault_id_t;
 
 #define FAULT_TASK_NAME_LEN 12U
-#define FAULT_MAGIC         0xF41C7E11UL /* "Fault" */
+#define FAULT_MAGIC 0xF41C7E11UL   /* "Fault" */
 #define FAULT_STACK_SNAP_WORDS 32U /* 栈快照 128B：故障点附近栈内容（调用链回溯用） */
 
 /* 崩溃现场记录（固定布局，跨复位保留） */
@@ -43,7 +43,7 @@ typedef struct {
     uint32_t seq;     /* 崩溃序号（自增） */
     uint32_t id;      /* fault_id_t */
     uint32_t tick_ms; /* 崩溃时系统 tick */
-    char     task[FAULT_TASK_NAME_LEN];
+    char task[FAULT_TASK_NAME_LEN];
     uint32_t pc;   /* 故障点 PC */
     uint32_t lr;   /* 故障点 LR（HardFault 时为栈帧 LR，freeze 时为调用者） */
     uint32_t xpsr; /* xPSR（HardFault 栈帧） */

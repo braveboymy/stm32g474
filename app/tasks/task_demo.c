@@ -63,9 +63,8 @@ void task_demo_entry(void* arg)
         if ((now - last_hb) >= DEMO_HEARTBEAT_MS) {
             last_hb = now;
             beat = beat + 1U;
-            uint32_t m = (uint32_t)snprintf((char*)buf, sizeof(buf),
-                                            "demo-alive %lu (%lu ms)\r\n",
-                                            (unsigned long)beat, (unsigned long)now);
+            uint32_t m = (uint32_t)snprintf(
+                (char*)buf, sizeof(buf), "demo-alive %lu (%lu ms)\r\n", (unsigned long)beat, (unsigned long)now);
             (void)usb_cdc_send(buf, m);
         }
     }

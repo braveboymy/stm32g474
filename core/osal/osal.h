@@ -13,8 +13,8 @@ typedef void* osal_task_t;
 typedef void* osal_mutex_t;
 
 /* 任务：栈大小单位 = 字（4 字节），优先级 0(最低)~7 */
-osal_task_t osal_task_create(const char* name, void (*entry)(void* arg), void* arg,
-                             uint32_t stack_words, uint32_t priority);
+osal_task_t
+osal_task_create(const char* name, void (*entry)(void* arg), void* arg, uint32_t stack_words, uint32_t priority);
 void osal_task_delay_ms(uint32_t ms);
 void osal_task_delay_until_ms(uint32_t* last_wake_ms, uint32_t period_ms);
 uint32_t osal_task_high_water_mark(osal_task_t task); /* NULL = 当前任务，单位：字 */
