@@ -19,8 +19,9 @@
 所有编译/烧录/调试/日志操作必须走项目脚本：
 
 ```bash
-python .pi/skills/stm32g474-devtools/scripts/dev.py build|flash|status|log|regs|verify
+python .pi/skills/stm32g474-devtools/scripts/dev.py build|flash|status|log|regs|verify|test
 # 等价底层：uv run python tools/devtool.py <cmd>；烧录 J-Link SWD 4MHz
+# test：core 层 PC 单测（rb/log，host gcc 无需硬件，见 tools/run_core_tests.sh）
 ```
 
 - 修改代码后**必须** `dev.py build` 验证编译通过

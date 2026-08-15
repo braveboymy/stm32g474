@@ -25,6 +25,15 @@ else
   FAILED=1
 fi
 
+echo "==> [pre-commit] core 层 PC 单测"
+if bash tools/run_core_tests.sh > /tmp/precommit_test.log 2>&1; then
+  echo "    ✅ 单测通过"
+else
+  echo "    ❌ 单测失败："
+  tail -20 /tmp/precommit_test.log | sed 's/^/      /'
+  FAILED=1
+fi
+
 echo "==> [pre-commit] MISRA C:2012 检查"
 if bash tools/check_misra.sh > /tmp/precommit_misra.log 2>&1; then
   echo "    ✅ 无 MISRA 违规"

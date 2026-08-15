@@ -307,6 +307,17 @@ def cmd_status(args) -> int:
 # info
 # ---------------------------------------------------------------------------
 
+def cmd_test(args) -> int:
+    """core 层 PC 单测（host gcc，无需硬件）"""
+    bash = shutil.which("bash")
+    if bash is None:
+        raise ToolError("未找到 bash（Git Bash 环境），无法运行 core 单测")
+    script = ROOT / "tools" / "run_core_tests.sh"
+    print(f"==> core 层 PC 单测（{script}）")
+    proc = subprocess.run([bash, str(script)], cwd=ROOT)
+    return proc.returncode
+
+
 def cmd_info(args) -> int:
     print(f"项目根目录: {ROOT}")
     for name in ("cmake", "ninja", "arm-none-eabi-gcc", "JLink.exe"):
@@ -455,10 +466,11 @@ def main() -> int:
     l = sub.add_parser("log", help="J-Link 读 RAM 日志镜像（无需串口）")
     l.add_argument("--tail", type=int, default=40, help="显示最近 N 条")
     l.add_argument("--timeout", type=int, default=90)
+    sub.add_parser("test", help="core 层 PC 单测（host gcc，无需硬件）")
     sub.add_parser("info", help="工具链与固件信息")
     args = p.parse_args()
     try:
-        return {"build": cmd_build, "connect": cmd_connect, "flash": cmd_flash, "status": cmd_status, "console": cmd_console, "log": cmd_log, "info": cmd_info}[args.cmd](args)
+        return {"build": cmd_build, "connect": cmd_connect, "flash": cmd_flash, "status": cmd_status, "console": cmd_console, "log": cmd_log, "test": cmd_test, "info": cmd_info}[args.cmd](args)
     except ToolError as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1
