@@ -36,7 +36,7 @@
 |---|---|---|---|---|
 | HSE 8MHz | Y1（位号标注于 CPU 右下区；全板仅 2 晶振，Y2 已确认 LSE，故 Y1=8MHz 归属可靠） | PF0-OSC_IN / PF1-OSC_OUT | C10 = 22pF；另一侧 ⚠️ 未识别（见 ⚠️8） | 主时钟源（M1 已按 24MHz HSE 配置，板级切换时需改 clock.c） |
 | LSE 32.768kHz | Y2 | PC14-OSC32_IN / PC15-OSC32_OUT | C8/C9 = 10pF ×2 | RTC 低速晶振 |
-| 时钟源选择 | — | — | — | 芯片默认 HSI，软件配置 HSE→PLL 170MHz（见 docs/architecture.md） |
+| 时钟源选择 | — | — | — | 芯片默认 HSI，软件配置 HSE→PLL 160MHz（见 docs/architecture.md） |
 
 ## 4. MCU 引脚连接总表
 

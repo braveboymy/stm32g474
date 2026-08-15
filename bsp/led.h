@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-/* 双 LED（DevEBox 定制板：PC13=D1、PD2=D2，高电平点亮） */
+/* 双 LED（DevEBox 定制板：PC13=D1、PD2=D2，共阳极 3V3，低电平点亮） */
 void led_init(void);
 void led1_on(void);
 void led1_off(void);

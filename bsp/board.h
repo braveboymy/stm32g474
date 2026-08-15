@@ -36,7 +36,7 @@
 /* 板级初始化：外设上电、时钟、引脚 */
 void bsp_board_init(void);
 
-/* 系统时钟：HSE(8MHz) -> PLL -> SYSCLK 170MHz（bsp/clock.c） */
+/* 系统时钟：HSE(8MHz) -> PLL -> SYSCLK 160MHz（bsp/clock.c） */
 void SystemClock_Config(void);
 
 /* 时钟频率查询（封装 HAL_RCC_Get*Freq，业务层经 bsp 访问，不直接依赖 HAL） */
