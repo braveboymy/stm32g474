@@ -1,6 +1,9 @@
 # stm32g474-platform
 
-基于 STM32G474 的通用嵌入式平台（方向：电机控制），当前处于 **M1：平台最小系统**。
+基于 STM32G474 的通用嵌入式平台（方向：电机控制）。
+
+**当前进度**：M1 平台最小系统 ✅ / M2 健壮性 ✅ / M4 USB-CDC ✅（帧协议待做）/ M7 PC 单测 ✅（CI 待做）
+下一阶段：**M5 信号链（ADC 同步采样 / CORDIC / PID / PWM，业务核心）**，详见 [docs/milestones.md](docs/milestones.md)。
 
 ## 快速开始
 
@@ -14,12 +17,13 @@ tools/fetch_third_party.sh
 # 2. 构建
 uv run python tools/devtool.py build [Debug|Release]
 
-# 3. J-Link 操作（NUCLEO-G474RE，SWD）
+# 3. J-Link 操作（STM32G474RE，SWD；NUCLEO / DevEBox 定制板均可）
 uv run python tools/devtool.py connect   # 连接测试
 uv run python tools/devtool.py flash     # 烧录 bootloader + app（0x08000000 + 0x08008000）
 uv run python tools/devtool.py status    # 读寄存器验证固件运行（TIM6 tick / LED）
 uv run python tools/devtool.py log       # J-Link 读 RAM 日志镜像（无需串口）
 uv run python tools/devtool.py console   # 串口看日志（有 ST-LINK VCP 时）
+uv run python tools/devtool.py test      # core 层 PC 单测（rb/log，host gcc 无需硬件）
 ```
 
 烧录也可以直接用已安装的 embeddedskills 的 jlink skill：
@@ -36,6 +40,7 @@ python ~/.pi/agent/skills/jlink/scripts/jlink_exec.py flash --file build/bin/app
 python .pi/skills/stm32g474-devtools/scripts/dev.py verify   # build -> flash -> status -> log
 python .pi/skills/stm32g474-devtools/scripts/dev.py regs     # 卡死时读 CPU 寄存器 + addr2line 定位
 python .pi/skills/stm32g474-devtools/scripts/dev.py log      # J-Link 读 RAM 日志（无串口可用）
+python .pi/skills/stm32g474-devtools/scripts/dev.py test     # core 层 PC 单测（无需硬件）
 ```
 
 排障经验（启动链路坑位、J-Link 注意事项、症状速查）见
@@ -46,7 +51,7 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py log      # J-Link 读 RAM �
 ```
 ├── app/            # 业务层（应用入口 main.c + 业务任务）
 │   └── tasks/      # 业务任务（task_demo / task_sysmon）与任务声明 tasks.h
-├── bsp/            # 板级支持：board / clock / led / uart / msp / timebase
+├── bsp/            # 板级支持：board / clock / led / uart / usb_device / msp / timebase
 │   ├── startup/    # 启动文件（从 CMSIS 模板复制，项目所有）
 │   ├── system/     # system_stm32g4xx.c（VECT_TAB_OFFSET=0x8000）
 │   └── linker/     # 应用链接脚本（分区见 docs/flash-partition.md）
@@ -54,10 +59,10 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py log      # J-Link 读 RAM �
 │   ├── osal/       # OS 抽象层 + FreeRTOS 集成（业务只依赖 osal.h）
 │   ├── fault/      # 故障管理：现场采集/栈回溯/复位上报（M2）
 │   ├── log/        # 分级日志（临界区保护，任务/中断均可用）
-│   ├── util/       # 环形缓冲等通用组件
-│   └── test/       # PC 端 host 单测落点（M7 实施，见 test/README.md）
+│   └── util/       # 环形缓冲等通用组件
+├── tests/core/     # PC 端 host 单测（rb/log + mock osal，dev.py test）
 ├── config/         # FreeRTOSConfig.h / stm32g4xx_hal_conf.h / platform.h / usbd_conf.h
-├── docs/           # 架构 / 分区 / 引脚 / 里程碑
+├── docs/           # 架构 / 分区 / 引脚 / 里程碑 / 编码规范 / MISRA 偏离
 ├── tools/          # 构建与第三方依赖脚本
 └── third_party/    # git 忽略，由 fetch_third_party.sh 拉取（版本锁定）
 ```
@@ -78,3 +83,5 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py log      # J-Link 读 RAM �
 - [Flash 分区](docs/flash-partition.md)
 - [引脚分配](docs/pinmap.md)
 - [里程碑路线图](docs/milestones.md)
+- [编码规范](docs/coding_standard.md)
+- [MISRA 偏离管理](docs/misra_deviation.md)
