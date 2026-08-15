@@ -176,9 +176,11 @@ add_executable(app
   app/tasks/task_demo.c
   app/tasks/task_sysmon.c
   app/tasks/task_wdg.c
+  app/conn/at.c
 )
 target_include_directories(app PRIVATE
   ${CMAKE_SOURCE_DIR}/app
+  ${CMAKE_SOURCE_DIR}/app/conn
   ${CMAKE_SOURCE_DIR}/bsp
   ${CMAKE_SOURCE_DIR}/bsp/usb_device
   ${CMAKE_SOURCE_DIR}/core
