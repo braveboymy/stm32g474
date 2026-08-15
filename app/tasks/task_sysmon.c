@@ -57,16 +57,15 @@ void task_sysmon_entry(void* arg)
         UBaseType_t n = uxTaskGetNumberOfTasks();
         TaskStatus_t* st = pvPortMalloc(sizeof(TaskStatus_t) * n);
         if (st != NULL) {
-            UBaseType_t total = 0;
-            if (uxTaskGetSystemState(st, n, &total) == pdPASS) {
-                for (UBaseType_t i = 0; i < total; i++) {
-                    LOG_I("mon",
-                          "task %-10s prio=%u state=%c stack_hw=%lu",
-                          st[i].pcTaskName,
-                          (unsigned)st[i].uxCurrentPriority,
-                          state_char(st[i].eCurrentState),
-                          (unsigned long)st[i].usStackHighWaterMark);
-                }
+            /* 返回值 = 实际填充的任务数；第三参为总运行时间（未开 RUN_TIME_STATS 恒 0），传 NULL */
+            UBaseType_t filled = uxTaskGetSystemState(st, n, NULL);
+            for (UBaseType_t i = 0; i < filled; i++) {
+                LOG_I("mon",
+                      "task %-10s prio=%u state=%c stack_hw=%lu",
+                      st[i].pcTaskName,
+                      (unsigned)st[i].uxCurrentPriority,
+                      state_char(st[i].eCurrentState),
+                      (unsigned long)st[i].usStackHighWaterMark);
             }
             vPortFree(st);
         }

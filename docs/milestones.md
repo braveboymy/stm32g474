@@ -19,10 +19,15 @@
 - [x] sysmon 周期输出任务表与堆水位
 - [x] 板卡实测（J-Link 烧录 + RAM 日志验证：时钟 160MHz、任务调度、堆稳定）
 
-## M1 遗留问题
+## M1 遗留问题（2026-08-15 已关闭）
 
-- **mon 任务表 pvPortMalloc 失败**：heap free 充足却 malloc 失败（heap_4 链表疑被踩），任务表一直未打印。
-  影响面：疑似内存踩踏，M5 信号链开发前必须排查（排查工具：dev.py regs + fault 栈回溯）。
+- ~~**mon 任务表 pvPortMalloc 失败**~~：排查结论——**非堆踩踏，是 sysmon 代码 bug**。
+  - 证据：J-Link 现场读 heap_4 free 链表——单一连续 40632B 块、无异常（对照 mon 日志 free 值吻合）；
+    诊断日志证实 malloc 成功（n=5 ok）、`uxTaskGetSystemState` 返回 5
+  - 根因：第三参数 `pulTotalRunTime`（总运行时间，未开 RUN_TIME_STATS 时恒 0）
+    被误当任务总数 → `for (i < total)` 循环 0 次 → 任务表永不打印；任务数应取返回值
+  - 修复：`filled = uxTaskGetSystemState(st, n, NULL)`，按返回值遍历
+  - 验证：任务表 5 任务正常打印（stack_hw: mon=890/demo=370/wdg=390/IDLE=102/Tmr=224）
 
 ## M4/M7 已完成增量（2026-08-15）
 
