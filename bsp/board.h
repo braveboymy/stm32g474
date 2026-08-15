@@ -8,7 +8,9 @@
  * 引脚出处：docs/hardware-schematic.md（原理图 OCR + 万用表实测定稿）
  * ==========================================================================*/
 
-/* 用户 LED：PC13（D1）、PD2（D2），510R 限流，高电平点亮 */
+/* 用户 LED：PC13（D1）、PD2（D2）
+ * 原理图（2026-08-15 复核）：共阳极接 3V3，阴极经 510Ω 到引脚 → 低电平点亮
+ * 出处：docs/STM32G474R开发板-原理图--202508.pdf（D1→R7→PC13、D2→R8→PD2） */
 #define BOARD_LED1_PORT  GPIOC
 #define BOARD_LED1_PIN   GPIO_PIN_13
 #define BOARD_LED2_PORT  GPIOD

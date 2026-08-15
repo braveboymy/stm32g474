@@ -20,6 +20,7 @@ set(FREERTOS_PORT    ${FREERTOS_DIR}/portable/GCC/ARM_CM4F)
 set(TARGET_DEFS
   STM32G474xx
   USE_HAL_DRIVER
+  HSE_VALUE=8000000U
 )
 
 add_compile_options(
@@ -120,6 +121,7 @@ add_library(platform STATIC
 )
 target_include_directories(platform PUBLIC
   ${CMAKE_SOURCE_DIR}/bsp
+  ${CMAKE_SOURCE_DIR}/bsp/usb_device
   ${CMAKE_SOURCE_DIR}/core
   ${CMAKE_SOURCE_DIR}/core/osal
   ${CMAKE_SOURCE_DIR}/core/log
@@ -167,7 +169,10 @@ add_executable(app
   bsp/hal_timebase.c
   bsp/msp.c
   bsp/retarget.c
-  bsp/usb_cdc.c
+  bsp/usb_device/usb_device.c
+  bsp/usb_device/usbd_conf.c
+  bsp/usb_device/usbd_desc.c
+  bsp/usb_device/usbd_cdc_if.c
   app/tasks/task_demo.c
   app/tasks/task_sysmon.c
   app/tasks/task_wdg.c
@@ -175,6 +180,7 @@ add_executable(app
 target_include_directories(app PRIVATE
   ${CMAKE_SOURCE_DIR}/app
   ${CMAKE_SOURCE_DIR}/bsp
+  ${CMAKE_SOURCE_DIR}/bsp/usb_device
   ${CMAKE_SOURCE_DIR}/core
   ${CMAKE_SOURCE_DIR}/core/osal
   ${CMAKE_SOURCE_DIR}/core/log

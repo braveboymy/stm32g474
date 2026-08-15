@@ -15,7 +15,14 @@
 #define configUSE_TICK_HOOK                     0
 #define configUSE_TICKLESS_IDLE                 0
 
-#define configCPU_CLOCK_HZ                      170000000UL
+/* CPU 时钟：必须与 bsp/clock.c 实际 SYSCLK 一致！
+ * 当前 = HSE 8MHz → PLL 160MHz（对齐 ai_stm32_prj 参考实现）
+ * 注意：禁止定义 configSYSTICK_CLOCK_HZ！——定义了会让 FreeRTOS port.c
+ * 走 else 分支（portNVIC_SYSTICK_CLK_BIT_CONFIG=0）→ SysTick 用 HCLK/8
+ * → tick 慢 8 倍（实测 125Hz，LED/任务全部变慢）。不定义 = CLKSOURCE=1 用 HCLK。
+ * 曾用 NUCLEO 170MHz 配 16MHz 实际时钟 → tick 94Hz → IWDG 复位循环（已修）
+ * 改动 bsp/clock.c 的 SYSCLK 时必须同步改这里 */
+#define configCPU_CLOCK_HZ                      160000000UL
 #define configTICK_RATE_HZ                      1000U
 #define configMAX_PRIORITIES                    8
 #define configMINIMAL_STACK_SIZE                128

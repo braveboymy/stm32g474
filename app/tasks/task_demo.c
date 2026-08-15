@@ -9,12 +9,13 @@
 #include <stdio.h>
 
 /* ============================================================================
- * 基础能力验证任务（定制板 demo）：
- *  - LED1（PC13）500ms 快闪：运行指示
+ * 基础能力验证任务（DevEBox 定制板 demo）：
+ *  - LED1（PC13）500ms 翻转：运行指示（共阳极 3V3，低电平点亮，toggle 无极性依赖）
  *  - LED2（PD2）1s 翻转：调度/心跳指示
- *  - USB CDC：初始化 + 回显（收到什么回什么）+ 2s 心跳字符串
- * 验证方式：PC 打开 COM 口（115200 无所谓，CDC 为 USB 速率），
- * 发送任意字符应原样返回，并周期收到 "demo-alive <tick>"
+ *  - USB CDC 虚拟串口（PA11/PA12）：初始化 + 回显 + 2s 心跳字符串
+ * 验证方式：Type-C 接 PC → 出现 COM 口 → 串口助手打开，
+ *   发送任意字符应原样返回，并每 2s 收到 "demo-alive <tick>"
+ * 引脚出处：docs/pinmap.md（原理图复核：D1→R7→PC13、D2→R8→PD2，低电平点亮）
  * ==========================================================================*/
 
 #define DEMO_ECHO_MAX 64U
@@ -30,11 +31,16 @@ void task_demo_entry(void* arg)
     uint8_t buf[DEMO_ECHO_MAX];
     uint32_t beat = 0U;
     uint32_t last_hb = 0U;
+    uint32_t led2_cnt = 0U;
 
     for (;;) {
+        /* LED 闪烁：LED1 快闪（500ms 亮/灭，周期 1s），LED2 慢闪（1s 亮/灭，周期 2s） */
         led1_toggle();
         osal_task_delay_ms(500U);
-        led2_toggle();
+        led2_cnt = led2_cnt + 1U;
+        if ((led2_cnt & 1U) == 0U) {
+            led2_toggle();
+        }
 
         /* USB 回显：收到的数据原样返回 */
         if (usb_cdc_available() > 0U) {
@@ -52,13 +58,14 @@ void task_demo_entry(void* arg)
             }
         }
 
-        /* USB 心跳输出（每 2s） */
+        /* USB 心跳输出（每 2s）：LED 状态 + 运行节拍 */
         uint32_t now = osal_tick_ms();
         if ((now - last_hb) >= DEMO_HEARTBEAT_MS) {
             last_hb = now;
             beat = beat + 1U;
             uint32_t m = (uint32_t)snprintf((char*)buf, sizeof(buf),
-                                            "demo-alive %lu\r\n", (unsigned long)beat);
+                                            "demo-alive %lu (%lu ms)\r\n",
+                                            (unsigned long)beat, (unsigned long)now);
             (void)usb_cdc_send(buf, m);
         }
     }
