@@ -15,7 +15,8 @@ description: >-
 ## 前置条件
 
 - 工具链：arm-none-eabi-gcc、cmake、ninja（`tools/devtool.py` 自动探测，无串口场景也可用）
-- J-Link 软件（V9.64+，安装于 `C:/Program Files/SEGGER/JLink_*/JLink.exe`），目标 STM32G474RE，SWD 4MHz
+- J-Link 软件（SEGGER 安装目录：`C:/Program Files/SEGGER/JLink_*` 或 `(x86)/SEGGER/JLink_*`，devtool.py 自动探测取版本最大者；本机已装 JLink_V688c），目标 STM32G474RE，SWD 4MHz
+- 若为克隆 J-Link：用环境变量 `JLINK_VERSION` 锁定版本（如 `JLINK_VERSION=688`），兼容版场景见 references/troubleshooting.md「Out of sync」
 - Python：项目根执行过 `uv sync`（`console` 子命令需 pyserial，其余零依赖）
 
 ## 标准流程（build → flash → verify）

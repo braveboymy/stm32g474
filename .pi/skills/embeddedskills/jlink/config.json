@@ -1,0 +1,10 @@
+{
+  "exe": "C:\\Program Files (x86)\\SEGGER\\JLink_V688c\\JLink.exe",
+  "gdbserver_exe": "C:\\Program Files (x86)\\SEGGER\\JLink_V688c\\JLinkGDBServerCL.exe",
+  "rtt_exe": "C:\\Program Files (x86)\\SEGGER\\JLink_V688c\\JLinkRTTClient.exe",
+  "gdb_exe": "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.2 rel1\\bin\\arm-none-eabi-gdb.exe",
+  "serial_no": "",
+  "rtt_telnet_port": 0,
+  "swo_command": [],
+  "operation_mode": 1
+}
