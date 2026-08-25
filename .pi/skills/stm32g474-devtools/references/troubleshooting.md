@@ -70,4 +70,5 @@
 | `T-bit of XPSR is 0` 警告 | 复位后 core 未正常执行（向量表问题） |
 | ODR 三次采样相同 | J-Link connect 时 halt 了 CPU（任务暂停），属正常现象 |
 | `Verify successful` 但程序不跑 | 复位向量问题（boot 缺失/向量表错误） |
+| IWDG 复位比预期快/慢 | LSI 本板实测 ≈96kHz（标称 32kHz 的 3 倍），换板/量产必须重新实测 LSI 并回来改 `bsp/board.h` 的 IWDG 分频/重载 |
 | J-Link `Out of sync, resynchronizing` | 仿真器固件与 DLL 不兼容（兼容版 J-Link 常见），换老版本软件或更新固件 |

@@ -29,7 +29,7 @@
 
 /* IWDG：LSI≈32kHz 标称，但本板实测 ≈96kHz（约 3 倍标称！）→ /64 → 实测 ~1.5kHz；
  * 重载 4095 → 标称 8.2s / 实测 ~2.7s 超时（保守化，喂狗周期 1s）。
- * 换板/量产必须重新实测 LSI（见 docs/session-summary.md M2 排坑②） */
+ * 换板/量产必须重新实测 LSI（见 .pi/skills/stm32g474-devtools/references/troubleshooting.md 症状表） */
 #define BOARD_IWDG_PRESCALER IWDG_PRESCALER_64
 #define BOARD_IWDG_RELOAD 4095U
 

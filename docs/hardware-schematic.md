@@ -13,8 +13,8 @@
 - Type-C 供电（VBUS 5V）+ STM32 USB Slave（PA11/PA12）
 - RT9193-33GB LDO 稳压（5V→3.3V）
 - SPI Flash 数据存储（W25Q16）
-- OLED/TFT 液晶接口（SPI2，J4 顶部直插口）+ SPI3 扩展排针（位号 ⚠️6）
-- SWD 调试接口、2×13 功能排针、2×13 模拟/GPIO 排针
+- OLED/TFT 液晶接口（SPI2，J3 直插口 1×8）+ SPI3 扩展排针（位号 ⚠️6）
+- SWD 调试接口、2×15 功能排针（J4）、2×15 模拟/GPIO 排针（J5）
 - RTC 电池接口（EX BAT）、2 用户按键、2 用户 LED、复位按键
 
 ## 2. 电源树
@@ -22,7 +22,7 @@
 | 电压域 | 来源 | 去向 | 备注 |
 |---|---|---|---|
 | `VBUS`（5V） | J1 Type-C 接口 VBUS 引脚 | U2.VIN、F1 保险丝 → `5V1` | Type-C 供电输入（"Type C-USB 供电"） |
-| `5V1` | F1（500mA 保险丝） | U2.VIN ⚠️（D4 串接与否待确认，见 ⚠️2） | OCR 可见 `5V1` 网络标签 |
+| `5V1` | F1（500mA 保险丝） | U2.VIN；**D4（5V1 稳压管）钳位 5V→3V3 过压** | OCR 可见 `5V1` 网络标签 |
 | `3V3` | U2 RT9193-33GB.VOUT（500mA LDO） | CPU VDD、U3.VCC、J4/J5、LED、按键、RTC 区 | 输出电容 C3/C4 10uF/10V，输入电容 C1/C2 10uF/10V |
 | `3V3`（VDDA/VREF+ 滤波域） | 经 R10/R11（0Ω 跳线，已实测已装）自 `3V3` 分出 | VDDA/VSSA/VREF+ | 已实测定稿：VREF+ = 3.30V（上电实测）；原识别 `3V3H` 为 OCR 低置信误读，按 `3V3` 处理 |
 | `VBAT` | Q1 BAT54C（双二极管防倒灌）← EX BAT（J5/板边电池座） | CPU VBAT 引脚，去耦 C6（104） | 图注 "RTC供电"；`GNDE_BAT` 为电池地网络 |
@@ -34,14 +34,14 @@
 
 | 时钟 | 器件 | 引脚 | 负载电容 | 说明 |
 |---|---|---|---|---|
-| HSE 8MHz | Y1（位号标注于 CPU 右下区；全板仅 2 晶振，Y2 已确认 LSE，故 Y1=8MHz 归属可靠） | PF0-OSC_IN / PF1-OSC_OUT | C10 = 22pF；另一侧 ⚠️ 未识别（见 ⚠️8） | 主时钟源（M1 已按 24MHz HSE 配置，板级切换时需改 clock.c） |
+| HSE 8MHz | Y1（位号标注于 CPU 右下区；全板仅 2 晶振，Y2 已确认 LSE，故 Y1=8MHz 归属可靠） | **PF0-OSC_IN / PF1-OSC_OUT**（LQFP64 引脚 5/6，数据手册 Figure 7 确认；PD0/PD1 仅存在于 LQFP80/100，本板无） | C10/C11 = 22pF ×2（2026-08-16 原理图复核，消除 ⚠️8） | 主时钟源（M1 已按 24MHz HSE 配置，板级切换时需改 clock.c） |
 | LSE 32.768kHz | Y2 | PC14-OSC32_IN / PC15-OSC32_OUT | C8/C9 = 10pF ×2 | RTC 低速晶振 |
 | 时钟源选择 | — | — | — | 芯片默认 HSI，软件配置 HSE→PLL 160MHz（见 docs/architecture.md） |
 
 ## 4. MCU 引脚连接总表
 
-> 排针说明：J1 = Type-C 接口（供电+USB，非排针）；J2 = SWD；J3 = 8 针电源排针（3V3/GND）；J4 = 2×13 功能排针（OLED/TFT + USART1 + USB + SPI3 + SPI2 + FDCAN）；J5 = 2×13 模拟/GPIO 排针；SPI3 扩展排针位号未识别（⚠️6）。
-> "连接对象"中 J1/J4/J5 表示该引脚引出至对应接口/排针。
+> 排针说明：J1 = Type-C 接口（供电+USB，非排针）；J2 = SWD（SPI_1X5）；J3 = **OLED/TFT 直插口**（1×8）；J4 = **2×15 功能排针**（30 脚：电源/OLED/SPI/通信全引出）；J5 = **2×15 模拟/GPIO 排针**；SPI3 扩展排针位号未识别（⚠️6）。
+> "连接对象"中 J1/J4/J5 表示该引脚引出至对应接口/排针；OLED 引脚（PB12~15、PC6/7）同时引至 J3 与 J4。
 
 | MCU 引脚 | 引脚功能 | 网络名 | 连接对象 | 方向 | 备注 |
 |---|---|---|---|---|---|
@@ -73,19 +73,19 @@
 | PB9 | GPIO | PB9 | J4 | BIDIR | 无复用标注 |
 | PB10 | GPIO | PB10 | J5 | BIDIR | 无复用标注 |
 | PB11 | GPIO | PB11 | J5 | BIDIR | 无复用标注（⚠️ 原提取稿误标 NC，实际引出 J5） |
-| PB12 | SPI2_NSS | SPI2_NSS / CS | J4（OLED/TFT 片选） | OUT | 已实测：Flash CS=PA15，PB12 仅作 OLED CS |
-| PB13 | AF5_SPI2_SCK | SPI2_SCK / SCL | J4 | OUT | 已实测：SPI2 仅供 OLED 接口（Flash 走 SPI3） |
-| PB14 | AF5_SPI2_MISO | SPI2_MISO / SDO | J4 | IN | 同上 |
-| PB15 | AF5_SPI2_MOSI | SPI2_MOSI / SDI | J4 | OUT | 同上 |
+| PB12 | SPI2_NSS | SPI2_NSS / CS | J3（OLED CS）+ J4 | OUT | 已实测：Flash CS=PA15，PB12 仅作 OLED CS |
+| PB13 | AF5_SPI2_SCK | SPI2_SCK / SCL | J3 + J4 | OUT | 已实测：SPI2 仅供 OLED 接口（Flash 走 SPI3） |
+| PB14 | AF5_SPI2_MISO | SPI2_MISO / SDO | J3 + J4 | IN | 同上 |
+| PB15 | AF5_SPI2_MOSI | SPI2_MOSI / SDI | J3 + J4 | OUT | 同上 |
 | PC0 | AF1_TIM1_CH1 | PC0/TIM1 CH1 | J5 | OUT | 电机 PWM 预留 |
 | PC1 | AF1_TIM1_CH2 | PC1/TIM1 CH2 | J5 | OUT | |
 | PC2 | AF1_TIM1_CH3 | PC2/TIM1_CH3 | J5 | OUT | |
 | PC3 | AF1_TIM1_CH4 | PC3/TIM1_CH4 | J5 | OUT | |
 | PC4 | GPIO | PC4 | J5 | BIDIR | 无复用标注 |
 | PC5 | GPIO | PC5 | J5 | BIDIR | 无复用标注 |
-| PC6 | GPIO_OUT | PC6/DC | J4 | OUT | OLED/TFT 数据/命令选择线（非 LED） |
-| PC7 | GPIO_OUT | PC7/BLK | J4 | OUT | OLED/TFT 背光控制 |
-| PC8 | GPIO | PC8 | J4 | BIDIR | 无复用标注 |
+| PC6 | GPIO_OUT | PC6/DC | J3 + J4 | OUT | OLED/TFT 数据/命令选择线（非 LED） |
+| PC7 | GPIO_OUT | PC7/BLK | J3 + J4 | OUT | OLED/TFT 背光控制 |
+| PC8 | GPIO | PC8 | J4 | BIDIR | 无复用标注（J4 第 9 脚） |
 | PC9 | GPIO | PC9 | J4 | BIDIR | 无复用标注 |
 | PC10 | AF6_SPI3_SCK | SPI3_SCK | SPI3 排针 + J4 + U3(CLK) | OUT | Flash 时钟（已实测） |
 | PC11 | AF6_SPI3_MISO | SPI3_MISO | SPI3 排针 + J4 + U3(SO) | IN | Flash MISO（已实测） |
@@ -118,23 +118,68 @@
 - WP 拉高至 3V3（写保护禁用，实测确认）；**HOLD 接法未测**（建议补测：U3.7 ↔ 3V3，通常与 WP 同接）
 - 与 OLED 接口无冲突：SPI2（PB12-15）仅供 OLED，Flash 独占 SPI3 总线与 PA15 片选
 
-### 5.4 OLED/TFT 液晶接口（J4 顶部 8 针）
-- **J4 顶部 2×4 为 OLED/TFT 模块直插口**（丝印）：NRST、PB12=CS、PB13=SCL、PB14=SDO、PB15=SDI、PC6=DC、PC7=BLK、PC8
-- 数据：SPI2（PB13/14/15 + PB12 CS）
-- J4 下部另有 SPI3 组（PA15/PC10/PC11/PC12，**Flash 总线，已实测**）与 SPI3 扩展排针（位号 ⚠️6）引出，**不是** OLED 接口数据线（第一次提取稿将其误当作 OLED 接口）
-- 兼容屏规格（图注）：0.96"/1.3" OLED、1.3"/2.0"/1.44"/1.8"/2.4"/2.8" TFT
+### 5.4 OLED/TFT 液晶接口（J3，1×8）
+
+- **J3 为 OLED/TFT 模块直插口**（丝印 `OLED/TFT`，1×8 排针，原理图 2026-08-16 复核确认）
+- 引脚：
+
+| J3 脚 | 信号 | MCU 引脚 |
+|---|---|---|
+| 1 | 3V3 | — |
+| 2 | SDI | PB15（SPI2_MOSI） |
+| 3 | SCL | PB13（SPI2_SCK） |
+| 4 | CS | PB12（SPI2_NSS） |
+| 5 | SDO | PB14（SPI2_MISO） |
+| 6 | DC | PC6 |
+| 7 | BLK | PC7 |
+| 8 | GND | — |
+
+- 数据：SPI2（PB12~15）；**与 Flash（SPI3）无冲突**（Flash 独占 SPI3 总线与 PA15 片选）
+- 兼容屏规格（丝印图注）：0.96"/1.3" OLED、1.3"/2.0"/1.44"/1.8"/2.4"/2.8" TFT
+- 注：J4 第 4~10 脚同样引出这些信号（PB12/13/14/15、PC6/7/8），便于杜邦线扩展
 
 ### 5.5 通信
-- USART1：PA9 TX / PA10 RX（J4）
-- FDCAN2：PB6 TX / PB5 RX（J4）
-- FDCAN3：PB4 TX / PB3 RX（J4）
+- USART1：PA9 TX / PA10 RX（J4，脚 13/14）
+- FDCAN2：PB6 TX / PB5 RX（J4，脚 26/25）
+- FDCAN3：PB4 TX / PB3 RX（J4，脚 24/23）
 
 ### 5.6 排针
-- **J1**：Type-C 接口（供电+USB，位号确认；与原理图 `J1 TYPE-C接口` 丝印一致）
+- **J1**：Type-C 接口（供电+USB，非排针）
+- **J2**：SWD 调试口（丝印 `SPI_1X5`，5 针）：3V3 / GND / PA13 SWDIO / PA14 SWCLK / NRST
+- **J3**：OLED/TFT 直插口（1×8，见 5.4）
+- **J4**：2×15 功能排针（丝印 `P2x15-2.54mm`，30 脚，通用 I/O）：
+
+| J4 脚 | 信号 | J4 脚 | 信号 |
+|---|---|---|---|
+| 1 | 5V | 2 | GND |
+| 3 | NRST | 4 | PB12/CS |
+| 5 | PB14/SDO | 6 | PB13/SCL |
+| 7 | PC6/DC | 8 | PB15/SDI |
+| 9 | PC8 | 10 | PC7/BLK |
+| 11 | PA8 | 12 | PC9 |
+| 13 | PA10/RXD1 | 14 | PA9/TXD1 |
+| 15 | PA12/USB_DP | 16 | PA11/USB_DM |
+| 17 | PC10 | 18 | PA15 |
+| 19 | PC12 | 20 | PC11 |
+| 21 | PB3 | 22 | PD2 |
+| 23 | PB5 | 24 | PB4 |
+| 25 | PB7 | 26 | PB6 |
+| 27 | PB9 | 28 | PB8/BOOT0 |
+| 29 | 3V3 | 30 | GND |
+
+- **J5**：2×15 模拟/GPIO 排针（丝印 `P2x15-2.54mm`，30 脚）：VDDA、VREF+、3V3、GND、PA0~PA7、PB0/1/2/10/11、PC0~PC5、PC13/14/15、EX BAT（25 脚）
 - **SPI3 扩展排针**：SPI3_NSS/MISO/SCK/MOSI（位号 ⚠️6 未识别）
-- **J3**：8 针电源排针（3V3/GND，丝印 `12345678`）⚠️6
-- **J4**：2×13 功能排针 —— OLED/TFT 直插口（NRST、PB12/13/14/15、PC6/7/8）+ USART1（PA9/10）+ USB（PA11/12）+ SPI3（PA15、PC10/11/12）+ FDCAN（PB3/4/5/6/7）+ BOOT0（PB8）+ 通用（PA8、PB9、PD2）
-- **J5**：2×13 模拟/GPIO 排针 —— VDDA/VREF+、PA0~PA7、PB0/1/2/10/11、PC0~PC5、PC13/14/15、EX BAT
+
+### 5.7 电机控制引脚预留（按实物定稿，业务定型后冻结）
+
+| 功能 | 首选外设/引脚 | 备注 |
+|---|---|---|
+| 6 路互补 PWM + 死区 | TIM1 CH1~CH4 = PC0~PC3（J5 引出） | 控制环中断裸跑；如需 HRTIM 需外接（本板无 HRTIM 引脚引出） |
+| 三相电流采样 | ADC1/2/3 注入组，TIM1_TRGO 触发 | 与 PWM 同步在中心点采样 |
+| 母线电压/温度 | ADC 规则组 + DMA | VREF+ = 3.3V（已实测）可直接量化 |
+| 编码器 | TIM 编码器模式 / SPI 绝对值（TLE5012B 等） | SPI3 总线已占 Flash，需另选 SPI 或软件接口 |
+| 驱动器通信 | FDCAN2（PB5/6）/ FDCAN3（PB3/4） | J4 引出 |
+| 模拟输出 | PA4/5/6（DAC1_OUT1/2、DAC2_OUT1） | 可作指令/监控输出 |
 
 ## 6. 板载器件
 
@@ -149,10 +194,10 @@
 | F1 | 保险丝（`500mA` 标注相邻，归属为推断） | 0603/0805（推断） | VBUS → 5V1 | 输入过流保护 |
 | D1 | LED 指示灯 | 3x4x2MM | PC13 → R7(510R) → GND | 用户 LED1（高电平点亮，推断） |
 | D2 | LED 指示灯 | 3x4x2MM | PD2 → R8(510R) → GND | 用户 LED2（⚠️ 位号推断） |
-| D4 | 二极管/TVS ⚠️2 | SMD | 5V1 网络 | 角色待确认（推断：防反接或 ESD） |
+| D4 | 5V1 稳压二极管 | SMD | 阳极 5V，阴极 3V3 | **5V 网络过压钳位（5V-3V3 > 5.1V 时导通）**；2026-08-16 原理图复核定稿，消除 ⚠️2 |
 | K1 | 轻触按键 3x4x2MM | — | PA0 + GND | 用户按键 1（已实测） |
 | K2 | 轻触按键 3x4x2MM | — | PA1 + GND | 用户按键 2（已实测） |
-| RST K | 轻触按键（位号 ⚠️7） | — | NRST + GND | 复位按键（SWD 旁） |
+| RST K | 轻触按键（位号 ⚠️7） | — | NRST + GND | 复位按键（SWD 旁），配 C7(104) 去抖 |
 | R1/R2 | 5.1k | 0402/0603（推断） | Type-C CC1/CC2 → GND | USB Device 配置 |
 | R6 | 5.1k | 同上 | BOOT0 → GND | BOOT0 下拉（推断） |
 | R7/R8 | 510R | 同上 | LED 限流 | PC13/PD2 串接 |
@@ -165,7 +210,7 @@
 | C3/C4 | 10uF/10V | SMD | 3V3 ↔ GND | LDO 输出滤波 |
 | C6 | 104 | SMD | VBAT ↔ GND | RTC 去耦 |
 | C8/C9 | 10pF | SMD | Y2 负载 | LSE |
-| C10 | 22pF | SMD | Y1 负载 | HSE |
+| C10/C11 | 22pF ×2 | SMD | Y1 负载 | HSE（2026-08-16 复核确认双电容，消除 ⚠️8） |
 | C18/C19/C20 | 103/105 | SMD | VDDA/VREF+ 滤波 | 模拟域 |
 | C13、EC14/EC16 | 104/106 阵列 | SMD（EC 为电解） | 3V3 ↔ GND | VDD 去耦（104×多 + 电解 106） |
 
@@ -175,12 +220,12 @@
 |---|---|---|---|
 | 输入过流保护 | F1（500mA 保险丝） | 电流 >500mA 熔断 | VBUS → 5V1 串接 |
 | VBAT 防倒灌 | Q1 BAT54C | 电池接入时 VBAT=电池电压；断电时防电池回流 3V3 | RTC 供电 |
-| 5V1 保护 ⚠️2 | D4 | 待确认（推断：防反接/ESD/TVS） | 5V1 网络 |
+| 5V 过压保护 | D4（5V1 稳压管，阳极 5V/阴极 3V3） | 5V 网络超过 3V3+5.1V 时导通钳位 | 防 LDO 输入端过压；已定稿 |
 | USB CC 配置 | R1/R2 5.1k 下拉 | Device 模式识别 | 非保护，属合规配置 |
 
 ## 8. 与现有文档的差异对照
 
-对照对象：docs/pinmap.md（NUCLEO-G474RE，M1 代码基线）。
+对照对象：历史板 NUCLEO-G474RE（M1 代码基线，原 docs/pinmap.md 已并入本文档）。
 
 | # | 项目 | NUCLEO-G474RE（原 pinmap） | DevEBox 定制板（本原理图） | 影响 |
 |---|---|---|---|---|
@@ -210,14 +255,25 @@
 | 按键 K1/K2 | PA0/PA1 + GND（低电平有效） | bsp 按键低有效 |
 | J1 位号 | Type-C 接口（非 SPI3 排针） | 无 |
 
-### 9.2 剩余不确定项（4 项）
+### 9.1b 原理图复核补充（2026-08-16，PyMuPDF 渲染 + 视觉复核 + 数据手册交叉验证）
+
+| 项 | 结论 | 消除 |
+|---|---|---|
+| HSE 引脚 | **PF0-OSC_IN（脚 5）/ PF1-OSC_OUT（脚 6）**（数据手册 Figure 7 LQFP64） | pinmap 旧文 PD0/PD1 为误（仅 LQFP80/100） |
+| Y1 负载电容 | C10/C11 = 22pF ×2 | ⚠️8 |
+| J3 | OLED/TFT 接口 1×8（3V3/PB15/PB13/PB12/PB14/PC6/PC7/GND） | 原“J4 顶部 2×4”写法更正；原“J3=8 针电源排针”为误读 |
+| J4 | **2×15**（30 脚完整定义见 5.6） | 原“2×13”更正 |
+| J5 | **2×15**（30 脚） | 原“2×13”更正 |
+| D4 | **5V1 稳压管**，阳极 5V / 阴极 3V3（过压钳位） | ⚠️2 |
+| RST 电路 | 按键 + C7(104) 去抖（无上拉电阻/大电容） | pinmap 旧文“R11(10Ω)+C20(1µF)”为误 |
+| U2 | RT9193-33GB（VOUT=3V3；78L05/1N5817 为视觉误读） | 维持原判 |
+
+### 9.2 剩余不确定项（2 项）
 
 | # | 内容 | 建议处理 |
 |---|---|---|
-| ⚠️2 | D4 器件角色（5V1 网络）未识别 | 实物丝印确认 |
-| ⚠️6 | SPI3 扩展排针位号未识别（J1 已确认是 Type-C）；J3 排针定义未完全识别 | 实物核对 |
-| ⚠️7 | RST 复位按键位号未识别（K3？） | 实物核对 |
-| ⚠️8 | 8MHz 晶振 Y1 另一侧负载电容未识别（仅 C10=22pF） | 局部 600DPI 复核或实物核对 |
+| ⚠️6 | SPI3 扩展排针位号未识别 | 实物核对 |
+| ⚠️7 | RST 复位按键具体位号（K3？） | 实物核对 |
 
 **补测建议**：U3.7（HOLD）↔ 3V3 导通性（未测，通常与 WP 同接拉高）。
 
@@ -226,13 +282,13 @@
 | # | 检查项 | 结果 |
 |---|---|---|
 | 1 | 电源树完整：每个电压域有来源（芯片+引脚）与去向 | ✅ 全部定稿（VREF+/VDDA 已实测 =3V3） |
-| 2 | 时钟：晶振频率/负载电容/引脚齐全，时钟源选择明确 | ⚠️ 基本齐全（Y1 另一侧电容 ⚠️8） |
+| 2 | 时钟：晶振频率/负载电容/引脚齐全，时钟源选择明确 | ✅ 齐全（Y1: PF0/PF1 + C10/C11 22pF；Y2: PC14/15 + C8/C9 10pF） |
 | 3 | MCU 引脚总表覆盖**全部**引脚（含 NC 行），无遗漏 | ✅ 覆盖 64 引脚全部（含电源/复位） |
 | 4 | 调试接口（SWD/JTAG/串口）引脚与连接完整 | ✅ SWD J2 + USART2 |
-| 5 | 所有 LED/按键/跳线/测量点已收录 | ✅ LED×2、按键×3、0Ω 跳线 R4/R10/R11（角色 ⚠️ 见器件表） |
-| 6 | 保护电路（若有）的触发条件与动作已描述 | ⚠️ F1/BAT54C 完整；D4 ⚠️2 |
-| 7 | ⚠️ 项数量已统计并逐条列出（不得静默吞掉） | ✅ 原 8 项中 4 项已实测定稿（9.1），剩余 4 项见 9.2 |
-| 8 | 与 docs/pinmap.md 的差异已写入第 8 章 | ✅ 10 项差异，含 M1 固件影响结论 |
-| 9 | 无任何凭经验"补全"的型号/参数/连接 | ⚠️ 关键连接已实测定稿；剩余推断（D4 角色、R6 下拉、封装等）均已显式标注 |
+| 5 | 所有 LED/按键/跳线/测量点已收录 | ✅ LED×2、按键×3、0Ω 跳线 R4/R10/R11 |
+| 6 | 保护电路（若有）的触发条件与动作已描述 | ✅ F1/BAT54C/D4（5V1 钳位）完整 |
+| 7 | ⚠️ 项数量已统计并逐条列出（不得静默吞掉） | ✅ 其余 2 项（⚠️6/⚠️7）见 9.2（⚠️2/⚠️8 已定稿消除） |
+| 8 | 与历史板（NUCLEO）的差异已写入第 8 章 | ✅ 10 项差异，含 M1 固件影响结论 |
+| 9 | 无任何凭经验"补全"的型号/参数/连接 | ✅ 关键连接已实测定稿 + 2026-08-16 原理图复核；仅剩 ⚠️6/⚠️7 待实物核对 |
 
-**遗留问题**：剩余 ⚠️2（D4）、⚠️6（排针位号）、⚠️7（RST 位号）、⚠️8（Y1 电容）均为实物核对类，不影响固件开发；建议补测 U3.7 HOLD 接法。文档可回填冻结 pinmap.md。
+**遗留问题**：剩余 ⚠️6（SPI3 扩展排针位号）、⚠️7（RST 按键位号）为实物核对类，不影响固件开发；建议补测 U3.7 HOLD 接法。本文件为引脚/硬件唯一事实源（原 pinmap.md 已删除，其 NUCLEO 段与电机预留已并入 §5.7/§8）。

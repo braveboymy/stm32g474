@@ -81,7 +81,7 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py test     # core 层 PC 单�
 
 - [架构与决策](docs/architecture.md)
 - [Flash 分区](docs/flash-partition.md)
-- [引脚分配](docs/pinmap.md)
+- [硬件原理图参考（引脚/排针/器件，唯一事实源）](docs/hardware-schematic.md)
 - [里程碑路线图](docs/milestones.md)
 - [编码规范](docs/coding_standard.md)
 - [MISRA 偏离管理](docs/misra_deviation.md)

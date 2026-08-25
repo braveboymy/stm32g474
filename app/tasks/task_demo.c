@@ -15,7 +15,7 @@
  *  - USB CDC 虚拟串口（PA11/PA12）：初始化 + 回显 + 2s 心跳字符串
  * 验证方式：Type-C 接 PC → 出现 COM 口 → 串口助手打开，
  *   发送任意字符应原样返回，并每 2s 收到 "demo-alive <tick>"
- * 引脚出处：docs/pinmap.md（原理图复核：D1→R7→PC13、D2→R8→PD2，低电平点亮）
+ * 引脚出处：docs/hardware-schematic.md §4 总表（D1→R7→PC13、D2→R8→PD2，低电平点亮）
  * ==========================================================================*/
 
 #define DEMO_ECHO_MAX 64U
