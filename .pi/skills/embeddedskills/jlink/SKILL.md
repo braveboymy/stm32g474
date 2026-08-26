@@ -94,6 +94,11 @@ skill 目录下的 `config.json` 包含环境级配置（工具路径、端口�
 | `gdb backtrace/locals` | 查看调用栈和局部变量 | arm-none-eabi-gdb |
 | `gdb break/continue/next/step/finish/until` | one-shot 控制执行流 | arm-none-eabi-gdb |
 | `gdb frame/print/watch/disassemble/threads/crash-report` | one-shot 源码级诊断 | arm-none-eabi-gdb |
+| `gdb x/rwatch/awatch` | 内存查看（x/8wx）/ 读监视 / 读写监视 | arm-none-eabi-gdb |
+
+> 注意：在 Git-Bash 下 `--expr` 以 `/` 开头的表达式（如 x 的 `/8wx`、print 的 `/x`）
+> 会被 MSYS 路径转换改写成 `C:/Program Files/Git/...`，脚本已自动还原；
+> 也可用 `MSYS_NO_PATHCONV=1` 前缀或把表达式全部加引号规避。
 
 ## 执行流程
 

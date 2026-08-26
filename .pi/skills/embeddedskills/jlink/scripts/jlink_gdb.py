@@ -52,7 +52,10 @@ ALL_COMMANDS = [
     "until",
     "frame",
     "print",
+    "x",
     "watch",
+    "rwatch",
+    "awatch",
     "disassemble",
     "threads",
     "crash-report",
@@ -160,7 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
         add_common_args(sub_parser)
         if name == "run":
             sub_parser.add_argument("--commands", nargs="+", required=True, help="GDB 命令序列")
-        elif name in {"break", "frame", "print", "watch"}:
+        elif name in {"break", "frame", "print", "x", "watch", "rwatch", "awatch"}:
             sub_parser.add_argument("--expr", required=True, help="表达式或参数")
         elif name in {"until", "disassemble"}:
             sub_parser.add_argument("--expr", default=None, help="表达式或参数")
@@ -241,6 +244,8 @@ def _summary(command: str, parsed: dict) -> str:
         return f"threads 完成，threads={len(parsed['threads'])}"
     if command == "print" and parsed.get("value"):
         return f"print 完成，value={parsed['value']}"
+    if command == "x" and parsed.get("memory"):
+        return f"x 完成，memory lines={len(parsed['memory'])}"
     return f"gdb {command} 完成"
 
 
@@ -256,6 +261,8 @@ def _metrics(parsed: dict) -> dict:
         metrics["threads"] = len(parsed["threads"])
     if parsed.get("disassembly"):
         metrics["instructions"] = len(parsed["disassembly"])
+    if parsed.get("memory"):
+        metrics["memory_lines"] = len(parsed["memory"])
     return metrics
 
 

@@ -15,6 +15,7 @@ INTROSPECTION_ACTIONS = {
     "locals",
     "frame",
     "print",
+    "x",
     "threads",
     "disassemble",
     "crash-report",
@@ -76,8 +77,18 @@ def require_action_expr(action: str, expr: str | None, hint: str) -> str:
     return expr
 
 
+def restore_msys_expr(expr: str) -> str:
+    """还原 Git-Bash 的 MSYS 路径转换：以 / 开头的表达式（如 x 命令的 /8wx 格式、
+    print 的 /x 格式）会被 MSYS 转成 'C:/Program Files/Git/...'，GDB 会把首 token
+    当符号导致 'No symbol "C"'。此处还原为原始 / 前缀形式。"""
+    match = re.match(r"^[A-Za-z]:/Program Files/Git/(.+)$", expr)
+    return "/" + match.group(1) if match else expr
+
+
 def build_gdb_commands(action: str, expr: str | None = None, *, halt_before: bool = True) -> list[str]:
     commands: list[str] = []
+    if expr:
+        expr = restore_msys_expr(expr)
     if halt_before and action in INTROSPECTION_ACTIONS | {"next", "step", "finish", "until"}:
         commands.append("monitor halt")
 
@@ -103,8 +114,10 @@ def build_gdb_commands(action: str, expr: str | None = None, *, halt_before: boo
         commands.append(f"frame {require_action_expr(action, expr, '--expr <帧号>')}")
     elif action == "print":
         commands.append(f"print {require_action_expr(action, expr, '--expr')}")
-    elif action == "watch":
-        commands.extend([f"watch {require_action_expr(action, expr, '--expr')}", "info breakpoints"])
+    elif action in {"watch", "rwatch", "awatch"}:
+        commands.extend([f"{action} {require_action_expr(action, expr, '--expr')}", "info breakpoints"])
+    elif action == "x":
+        commands.append(f"x {require_action_expr(action, expr, '--expr')}")
     elif action == "disassemble":
         commands.append(f"disassemble {expr}" if expr else "disassemble")
     elif action == "threads":
@@ -218,6 +231,19 @@ def _parse_selected_frame(stdout: str) -> dict[str, Any]:
     return selected
 
 
+def _parse_memory(stdout: str) -> list[dict[str, str]]:
+    """解析 x/ 命令输出：0x地址 [<符号>]: 字节值行。"""
+    items: list[dict[str, str]] = []
+    for line in stdout.splitlines():
+        match = re.match(r"^(0x[0-9a-fA-F]+)(?: <([^>]+)>)?:\s+(.+)$", line.strip())
+        if match:
+            item = {"address": match.group(1), "value": match.group(3).strip()}
+            if match.group(2):
+                item["symbol"] = match.group(2).strip()
+            items.append(item)
+    return items
+
+
 def parse_gdb_output(stdout: str, action: str) -> dict:
     frames = _parse_frames(stdout)
     variables = _parse_variables(stdout)
@@ -251,5 +277,9 @@ def parse_gdb_output(stdout: str, action: str) -> dict:
         match = re.search(r"\$\d+\s*=\s*(.+)", stdout)
         if match:
             parsed["value"] = match.group(1).strip()
+    elif action == "x":
+        memory = _parse_memory(stdout)
+        if memory:
+            parsed["memory"] = memory
 
     return parsed
