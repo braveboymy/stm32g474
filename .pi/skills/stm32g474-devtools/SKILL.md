@@ -117,4 +117,5 @@ value-range=全部采集值在 [gte,lte]（无采集判不过）。任何断言�
 
 - [排错手册：启动链路与常见症状](references/troubleshooting.md)（本轮实测踩坑记录）
 - 分区约定：`docs/flash-partition.md`（boot 32KB / app 448KB @0x08008000 / 参数 32KB）
+- LLM 调试代理全文：`docs/debug-agent.md`（命令/数据格式/踩坑记录/路线图）
 - 底层工具：`tools/devtool.py`（uv 管理）、`tools/fetch_third_party.sh`（依赖锁定）
