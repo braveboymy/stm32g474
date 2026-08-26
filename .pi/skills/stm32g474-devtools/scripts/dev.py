@@ -76,6 +76,17 @@ def re_search_pc(out: str) -> str | None:
     return m.group(1) if m else None
 
 
+def cmd_debug(args) -> int:
+    """转发到 jlink skill 的 gdb_agent.py（LLM 调试代理：断点持久化 + 事件采集）。"""
+    agent = ROOT / ".pi" / "skills" / "embeddedskills" / "jlink" / "scripts" / "gdb_agent.py"
+    if not agent.exists():
+        print(f"==> gdb_agent.py 不存在: {agent}")
+        return 1
+    cmd = python_cmd() + [str(agent)] + args.agent_args
+    print(f"==> {' '.join(str(c) for c in cmd)}")
+    return subprocess.call(cmd, cwd=ROOT)
+
+
 def cmd_verify(args) -> int:
     for step in ("build", "flash"):
         if devtool_run([step]) != 0:
@@ -111,12 +122,21 @@ def main() -> int:
     v.add_argument("--tail", type=int, default=40)
     v.add_argument("build_type", nargs="?", default="Release", choices=["Debug", "Release"])
 
+    d = sub.add_parser("debug", help="LLM 调试代理：持久断点 + 命中事件采集（gdb_agent）")
+    d.add_argument(
+        "agent_args",
+        nargs=argparse.REMAINDER,
+        metavar="<break|run|step|next|finish|reset|status|list|delete|events|clear> [args...]",
+    )
+
     args = p.parse_args()
 
     if args.cmd == "regs":
         return cmd_regs(args)
     if args.cmd == "verify":
         return cmd_verify(args)
+    if args.cmd == "debug":
+        return cmd_debug(args)
     return 1
 
 

@@ -47,7 +47,28 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py verify
 | `dev.py log [--tail N]` | J-Link 读 RAM 日志镜像（无串口可用） | `[00035000] I/mon(mon): heap free=47400` |
 | `dev.py console [--list]` | 串口日志（需 ST-LINK VCP） | 实时日志流，Ctrl+C 退出 |
 | `dev.py regs` | halt 后读 CPU 寄存器 + addr2line 定位 PC | `PC = 0800BA5C` + 对应函数 |
+| `dev.py debug` | LLM 调试代理（gdb_agent）：持久断点 + 命中事件采集 | 见下方「LLM 调试代理」节 |
 | `dev.py verify` | 一键闭环（build→flash→status→log） | 全流程输出 |
+
+## LLM 调试代理（dev.py debug）
+
+断点/事件持久化在 `build/debug/`，每次命令独立会话但状态跨命令存续，适合 LLM 全自动调试：
+
+```bash
+dev.py debug break --spec "task_sysmon.c:54" --cond "g_sysmon_beat == 3" --mode record
+#     record=命中自动快照+继续（写入 events.jsonl）；stop=命中即停
+dev.py debug run --stop-after 2 --timeout 30   # 重放断点，收集 N 个事件后停止
+dev.py debug step|next|finish                  # 单步/越过/运行到返回
+dev.py debug reset [--run]                     # 复位目标（默认 halt；--run 恢复运行）
+dev.py debug status                            # 目标当前 PC/帧/寄存器
+dev.py debug list|delete --id N|clear          # 断点管理
+dev.py debug events --tail 10                  # 回查事件时间线（每行含 frame/locals/regs 快照）
+```
+
+注意事项：
+- 断点一律硬件断点（hbreak/DWT，共 4 个）：Flash 软件断点会触发 STM32G4 单 bank RWW 冲突 HardFault
+- 调试 halt 时 IWDG 照常计数：长时间暂停可能被复位，复位后断点条件可能不再命中
+- 条件表达式优先用全局变量（局部变量在 -Og 下可能 optimized out）
 
 ## 日志获取（两种通道）
 
