@@ -1,0 +1,40 @@
+{
+  "name": "sysmon-heartbeat",
+  "setup": {
+    "reset": true
+  },
+  "breakpoints": [
+    {
+      "spec": "task_sysmon.c:54",
+      "cond": "g_sysmon_beat >= 3",
+      "mode": "record",
+      "watch_exprs": [
+        "g_sysmon_beat",
+        "sys_freq"
+      ]
+    }
+  ],
+  "run": {
+    "stop_after": 2,
+    "timeout": 20
+  },
+  "asserts": [
+    {
+      "type": "event-count",
+      "bp_id": 1,
+      "min": 2,
+      "max": 2
+    },
+    {
+      "type": "value-equals",
+      "expr": "sys_freq",
+      "value": "160000000"
+    },
+    {
+      "type": "value-range",
+      "expr": "g_sysmon_beat",
+      "gte": 0,
+      "lte": 10
+    }
+  ]
+}

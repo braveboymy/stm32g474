@@ -67,8 +67,32 @@ dev.py debug status                            # 目标当前 PC/帧/寄存器
 dev.py debug list|delete --id N|clear          # 断点管理
 dev.py debug events --tail 10                  # 回查事件时间线（每行含 frame/locals/regs/values 快照）
 dev.py debug trace [--expr g_sysmon_beat]      # 变量轨迹导出 CSV（来自事件 values，可过滤列）
+dev.py debug regress --scenario xxx.json --repeat 3   # 断点回归（隔离执行，不污染断点/事件）
 dev.py debug serve [--port 8765]               # Web 监督面板（静态页实时渲染断点/事件）
 ```
+
+### 回归场景文件（JSON，示例：tools/scenarios/sysmon-heartbeat.json）
+
+```json
+{
+  "name": "sysmon-heartbeat",                  // 必填
+  "setup": {"reset": true},                    // 可选：每轮 run 前复位目标
+  "breakpoints": [                             // 必填（≥1）；字段同 break 子命令
+    {"spec": "task_sysmon.c:54", "cond": "g_sysmon_beat >= 3",
+     "mode": "record", "watch_exprs": ["g_sysmon_beat", "sys_freq"]}
+  ],
+  "run": {"stop_after": 2, "timeout": 20},    // 可选
+  "asserts": [                                 // 可选；判据见下
+    {"type": "event-count", "bp_id": 1, "min": 2, "max": 2},
+    {"type": "value-equals", "expr": "sys_freq", "value": "160000000"},
+    {"type": "value-range", "expr": "g_sysmon_beat", "gte": 0, "lte": 10}
+  ]
+}
+```
+
+断言语义：event-count=某断点本轮事件数在 [min,max]；value-equals=任一事件 values 命中该值；
+value-range=全部采集值在 [gte,lte]（无采集判不过）。任何断言失败 → regress 返回 status=error，
+可用 --output 落盘报告 JSON。场景目录建议 tools/scenarios/（随固件演进入库）。
 
 注意事项：
 - 断点一律硬件断点（hbreak/DWT，共 4 个）：Flash 软件断点会触发 STM32G4 单 bank RWW 冲突 HardFault

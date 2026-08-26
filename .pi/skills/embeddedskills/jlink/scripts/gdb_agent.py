@@ -79,6 +79,7 @@ COMMANDS = {
     "reset": "复位目标（SYSRESETREQ）并立即 halt",
     "status": "目标当前状态（halt 后）",
     "trace": "导出事件变量轨迹 CSV（values 列）",
+    "regress": "断点回归：场景重放+断言判定（隔离执行）",
     "serve": "启动 Web 监督面板（静态服务 build/debug/）",
     "events": "读取事件时间线",
     "clear": "清空断点表与事件",
@@ -621,31 +622,36 @@ def cmd_delete(args: argparse.Namespace, session: dict[str, Any], started_at: st
     )
 
 
-def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, started_ts: float) -> dict:
-    debug_dir = session["debug_dir"]
-    items, _ = _load_breakpoints(debug_dir)
-    if not items:
-        raise ValueError("断点表为空，请先执行 break")
-    elf_file = session["elf_file"]
-    if not Path(elf_file).exists():
-        raise ValueError(f"ELF 不存在: {elf_file}（先执行 dev.py build）")
+def _run_scenario_once(
+    session: dict[str, Any],
+    items: list[dict[str, Any]],
+    *,
+    stop_after: int,
+    timeout: int,
+    reset: bool,
+) -> dict[str, Any]:
+    """执行一轮断点重放：起 gdb 会话 → 重放断点（可选前置复位）→ continue → 解析事件。
 
+    返回 {status, timed_out, events, bp_map, warnings, server_output, returncode}。
+    不写 events.jsonl、不更新 hits（由调用方决定；回归场景需隔离）。
+    """
+    elf_file = session["elf_file"]
     gdb_proc, gdb_port, server_output = _start_gdbserver(session)
     procs: list[Any] = [gdb_proc]
     try:
         cmds = []
-        if args.reset:
+        if reset:
             # monitor reset 会触发 VC_CORERESET 向量捕获：continue 立即收到 SIGTRAP 停住。
             # handle SIGTRAP nostop 放行（hbreak 命中是 T05 停止包，不受影响）。
             cmds = ["monitor reset", "handle SIGTRAP nostop noprint pass"]
-        cmds += build_replay_commands(items, with_record=True, stop_after=args.stop_after)
+        cmds += build_replay_commands(items, with_record=True, stop_after=stop_after)
         cmds.append("set $_agent_hits = 0")
         cmds.append("continue")
         cmds.append(f'printf "{FINAL_MARKER}"')
         cmds.append("bt 1")
         cmds.append("info locals")
         cmds.append("info registers")
-        res = run_gdb_script(session["gdb_exe"], elf_file, f"localhost:{gdb_port}", cmds, timeout=args.timeout)
+        res = run_gdb_script(session["gdb_exe"], elf_file, f"localhost:{gdb_port}", cmds, timeout=timeout)
     finally:
         cleanup(procs)
 
@@ -692,6 +698,34 @@ def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, 
             event.update(snap)
             events.append(event)
 
+    timed_out = res.get("status") == "timeout"
+    failed = [item for item in items if item.get("id") not in bp_map.values()]
+    warnings = [f"断点 id={item['id']} 重放失败（spec: {item['spec']}）" for item in failed]
+    return {
+        "status": res.get("status"),
+        "timed_out": timed_out,
+        "events": events,
+        "bp_map": bp_map,
+        "warnings": warnings,
+        "gdb_port": gdb_port,
+        "server_output": server_output,
+        "returncode": res.get("returncode", 0),
+    }
+
+
+def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, started_ts: float) -> dict:
+    debug_dir = session["debug_dir"]
+    items, _ = _load_breakpoints(debug_dir)
+    if not items:
+        raise ValueError("断点表为空，请先执行 break")
+    elf_file = session["elf_file"]
+    if not Path(elf_file).exists():
+        raise ValueError(f"ELF 不存在: {elf_file}（先执行 dev.py build）")
+
+    outcome = _run_scenario_once(
+        session, items, stop_after=args.stop_after, timeout=args.timeout, reset=args.reset
+    )
+    events = outcome["events"]
     if not _acquire_lock(debug_dir):
         raise OSError("状态文件被占用，请稍后重试")
     try:
@@ -700,10 +734,8 @@ def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, 
     finally:
         _release_lock(debug_dir)
 
-    timed_out = res.get("status") == "timeout"
-    failed = [item for item in items if item.get("id") not in bp_map.values()]
-    warnings = [f"断点 id={item['id']} 重放失败（spec: {item['spec']}）" for item in failed]
-    status = "ok" if res.get("status") in ("ok", "timeout") else "error"
+    timed_out = outcome["timed_out"]
+    status = "ok" if outcome["status"] in ("ok", "timeout") else "error"
     summary = f"run 完成，捕获事件 {len(events)} 个" + ("（超时）" if timed_out else "")
     return make_result(
         status=status,
@@ -712,10 +744,10 @@ def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, 
         details={
             "events": events,
             "timed_out": timed_out,
-            "warnings": warnings,
-            "gdb_port": gdb_port,
-            "server_output": server_output,
-            "returncode": res.get("returncode", 0),
+            "warnings": outcome["warnings"],
+            "gdb_port": outcome.get("gdb_port"),
+            "server_output": outcome["server_output"],
+            "returncode": outcome["returncode"],
         },
         context=_session_context(session),
         metrics={"events": len(events), "breakpoints": len(items)},
@@ -851,6 +883,178 @@ def cmd_events(args: argparse.Namespace, session: dict[str, Any], started_at: st
         },
         context=_session_context(session),
         metrics={"events": len(events)},
+        timing=make_timing(started_at, (time.time() - started_ts) * 1000),
+    )
+
+
+VALID_ASSERT_TYPES = {"event-count", "value-equals", "value-range"}
+
+
+def _load_scenario(path: Path) -> dict[str, Any]:
+    """加载并校验回归场景文件（JSON）。失败抛 ValueError。"""
+    if not path.exists():
+        raise ValueError(f"场景文件不存在: {path}")
+    try:
+        scenario = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"场景 JSON 解析失败: {exc}") from exc
+    if not isinstance(scenario, dict):
+        raise ValueError("场景根节点必须是 JSON 对象")
+    if not scenario.get("name"):
+        raise ValueError("场景缺少必填字段: name")
+    bps = scenario.get("breakpoints")
+    if not isinstance(bps, list) or not bps:
+        raise ValueError("场景缺少必填字段: breakpoints（非空数组）")
+    ids: set[int] = set()
+    for index, bp in enumerate(bps, start=1):
+        if not isinstance(bp, dict) or not bp.get("spec"):
+            raise ValueError(f"breakpoints[{index}] 缺少 spec")
+        bp_id = int(bp.get("id", index))
+        if bp_id in ids:
+            raise ValueError(f"断点 id={bp_id} 重复")
+        ids.add(bp_id)
+        if bp.get("mode", "record") not in ("record", "stop"):
+            raise ValueError(f"breakpoints[{index}] mode 非法（record/stop）")
+        for expr in bp.get("watch_exprs") or []:
+            if not isinstance(expr, str) or not expr.strip():
+                raise ValueError(f"breakpoints[{index}] watch_exprs 含空表达式")
+    asserts = scenario.get("asserts") or []
+    if not isinstance(asserts, list):
+        raise ValueError("asserts 必须是数组")
+    for index, assert_item in enumerate(asserts, start=1):
+        atype = assert_item.get("type") if isinstance(assert_item, dict) else None
+        if atype not in VALID_ASSERT_TYPES:
+            raise ValueError(f"asserts[{index}] 类型非法（{VALID_ASSERT_TYPES}）")
+        if atype == "event-count" and assert_item.get("bp_id") is None:
+            raise ValueError(f"asserts[{index}] event-count 缺少 bp_id")
+        if atype in ("value-equals", "value-range") and not assert_item.get("expr"):
+            raise ValueError(f"asserts[{index}] {atype} 缺少 expr")
+    return scenario
+
+
+def _evaluate_asserts(asserts: list[dict[str, Any]], events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """逐条断言判定。
+
+    value-equals=任一事件命中即过；value-range=全部采集值在界内（无采集=不过）。
+    """
+    results: list[dict[str, Any]] = []
+    for assert_item in asserts:
+        atype = assert_item.get("type")
+        passed = False
+        detail = ""
+        if atype == "event-count":
+            bp_id = assert_item.get("bp_id")
+            count = sum(1 for event in events if event.get("bp_id") == bp_id)
+            low = int(assert_item.get("min", 0))
+            high = int(assert_item.get("max", 1_000_000_000))
+            passed = low <= count <= high
+            detail = f"bp={bp_id} 事件数={count}（期望 {low}..{high}）"
+        elif atype == "value-equals":
+            expr = assert_item.get("expr")
+            want = str(assert_item.get("value", ""))
+            got = [event["values"][expr] for event in events if expr in (event.get("values") or {})]
+            passed = want in got
+            detail = f"{expr}={got if got else '<无采集>'}（期望 {want}）"
+        elif atype == "value-range":
+            expr = assert_item.get("expr")
+            low = assert_item.get("gte")
+            high = assert_item.get("lte")
+            nums: list[float] = []
+            for event in events:
+                raw = (event.get("values") or {}).get(expr)
+                if raw is None:
+                    continue
+                try:
+                    nums.append(float(str(raw)))
+                except ValueError:
+                    continue
+            if nums:
+                passed = all(
+                    (low is None or low <= value) and (high is None or value <= high) for value in nums
+                )
+            else:
+                passed = False
+            detail = f"{expr}={nums if nums else '<无采集>'}（期望 {low}..{high}）"
+        results.append({"type": atype, "passed": passed, "detail": detail})
+    return results
+
+
+def cmd_regress(args: argparse.Namespace, session: dict[str, Any], started_at: str, started_ts: float) -> dict:
+    """断点回归：加载场景 → 每轮重放断点收集事件 → 断言判定 → 聚合报告。
+
+    隔离执行：不写 events.jsonl、不更新断点 hits，不污染交互式调试状态。
+    """
+    debug_dir = session["debug_dir"]
+    scenario = _load_scenario(Path(args.scenario))
+    elf_file = session["elf_file"]
+    if not Path(elf_file).exists():
+        raise ValueError(f"ELF 不存在: {elf_file}（先执行 dev.py build）")
+
+    items: list[dict[str, Any]] = []
+    for bp in scenario["breakpoints"]:
+        items.append(
+            {
+                "id": int(bp.get("id", len(items) + 1)),
+                "spec": bp["spec"],
+                "cond": bp.get("cond") or None,
+                "mode": bp.get("mode", "record"),
+                "watch_exprs": list(bp.get("watch_exprs") or []),
+                "hits": 0,
+                "created_at": now_iso_ms(),
+                "last_hit_at": None,
+            }
+        )
+
+    run_cfg = scenario.get("run") or {}
+    stop_after = int(run_cfg.get("stop_after", 1))
+    timeout = args.timeout if args.timeout else int(run_cfg.get("timeout", 30))
+    reset = bool((scenario.get("setup") or {}).get("reset", False))
+    asserts = scenario.get("asserts") or []
+    repeat = max(1, args.repeat)
+
+    rounds: list[dict[str, Any]] = []
+    for round_index in range(1, repeat + 1):
+        outcome = _run_scenario_once(
+            session, items, stop_after=stop_after, timeout=timeout, reset=reset
+        )
+        results = _evaluate_asserts(asserts, outcome["events"]) if asserts else []
+        passed = all(item_pass["passed"] for item_pass in results) if results else (not outcome["timed_out"])
+        rounds.append(
+            {
+                "round": round_index,
+                "events": len(outcome["events"]),
+                "timed_out": outcome["timed_out"],
+                "asserts": results,
+                "passed": passed,
+                "warnings": outcome["warnings"],
+            }
+        )
+
+    passed_rounds = sum(1 for round_item in rounds if round_item["passed"])
+    status = "ok" if passed_rounds == len(rounds) else "error"
+    report = {
+        "scenario": scenario.get("name"),
+        "breakpoints": len(items),
+        "repeat": repeat,
+        "passed_rounds": passed_rounds,
+        "rounds": rounds,
+        "asserts": asserts,
+    }
+    if args.output:
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    summary = f"回归 {scenario.get('name')}: {passed_rounds}/{repeat} 轮通过"
+    if passed_rounds < len(rounds):
+        summary = summary + "（有断言失败）"
+    return make_result(
+        status=status,
+        action="regress",
+        summary=summary,
+        details={"report": report, "output": str(out_path) if args.output else None},
+        context=_session_context(session),
+        metrics={"rounds": len(rounds), "passed_rounds": passed_rounds},
         timing=make_timing(started_at, (time.time() - started_ts) * 1000),
     )
 
@@ -998,6 +1202,11 @@ def build_parser() -> argparse.ArgumentParser:
         elif name == "trace":
             sub_parser.add_argument("--expr", default=None, help="要导出的变量名，逗号分隔（默认导出全部 values 键）")
             sub_parser.add_argument("--output", default=None, help="CSV 输出路径（默认 build/debug/trace_<ts>.csv）")
+        elif name == "regress":
+            sub_parser.add_argument("--scenario", required=True, help="场景 JSON 路径（schema 见 SKILL.md）")
+            sub_parser.add_argument("--repeat", type=int, default=1, help="重复轮数（默认 1）")
+            sub_parser.add_argument("--timeout", type=int, default=0, help="覆盖场景 run.timeout（0=用场景值）")
+            sub_parser.add_argument("--output", default=None, help="报告 JSON 输出路径（默认不落盘）")
         elif name in ("step", "next", "finish"):
             sub_parser.add_argument("--timeout", type=int, default=30, help="执行超时秒数（默认 30）")
         elif name == "reset":
@@ -1050,7 +1259,7 @@ def main() -> None:
     project_config = load_project_config(str(workspace))
 
     try:
-        hardware = args.command in {"break", "run", "step", "next", "finish", "status", "reset"}
+        hardware = args.command in {"break", "run", "step", "next", "finish", "status", "reset", "regress"}
         session = _resolve_session(
             args,
             config,
@@ -1076,6 +1285,8 @@ def main() -> None:
             result = cmd_reset(args, session, started_at, started_ts)
         elif args.command == "trace":
             result = cmd_trace(args, session, started_at, started_ts)
+        elif args.command == "regress":
+            result = cmd_regress(args, session, started_at, started_ts)
         elif args.command == "serve":
             result = cmd_serve(args, session, started_at, started_ts)
         elif args.command == "events":
@@ -1115,6 +1326,17 @@ def main() -> None:
             _print_events(details.get("events", []))
         elif args.command == "trace":
             print(f"  output: {details.get('output')}")
+        elif args.command == "regress":
+            report = details.get("report") or {}
+            for round_item in report.get("rounds", []):
+                flag = "PASS" if round_item["passed"] else "FAIL"
+                tail = "（超时）" if round_item["timed_out"] else ""
+                print(f"  #{round_item['round']} {flag} events={round_item['events']}{tail}")
+                for assert_result in round_item.get("asserts", []):
+                    mark = "✓" if assert_result["passed"] else "✗"
+                    print(f"    {mark} {assert_result['type']}: {assert_result['detail']}")
+            if details.get("output"):
+                print(f"  report: {details['output']}")
         elif args.command == "serve":
             print(f"  {details.get('url')}")
         elif args.command == "status":
