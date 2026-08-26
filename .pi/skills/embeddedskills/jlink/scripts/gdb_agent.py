@@ -61,6 +61,13 @@ from jlink_runtime import (  # noqa: E402
     workspace_root,
 )
 
+
+def now_iso_ms() -> str:
+    """毫秒级 ISO 时间戳：调试事件同秒多次命中时需要区分先后顺序。"""
+    from datetime import datetime
+
+    return datetime.now().astimezone().isoformat(timespec="milliseconds")
+
 COMMANDS = {
     "break": "添加/更新断点（持久化）",
     "list": "列出断点表（只读，不连目标）",
@@ -71,6 +78,8 @@ COMMANDS = {
     "finish": "运行到函数返回",
     "reset": "复位目标（SYSRESETREQ）并立即 halt",
     "status": "目标当前状态（halt 后）",
+    "trace": "导出事件变量轨迹 CSV（values 列）",
+    "serve": "启动 Web 监督面板（静态服务 build/debug/）",
     "events": "读取事件时间线",
     "clear": "清空断点表与事件",
 }
@@ -180,6 +189,8 @@ def _commands_block(item: dict[str, Any], stop_after: int | None) -> str:
     lines.append("bt")
     lines.append("info locals")
     lines.append("info registers")
+    for expr in item.get("watch_exprs") or []:
+        lines.append(f"p {expr}")
     lines.append("set $_agent_hits = $_agent_hits + 1")
     if stop_after is not None and stop_after > 0:
         lines.append(f"if $_agent_hits < {stop_after}")
@@ -290,13 +301,23 @@ def _parse_bp_map(stdout: str) -> dict[int, int]:
     return mapping
 
 
-def _snapshot_from_body(body: str) -> dict[str, Any]:
+VALUE_RE = re.compile(r"^\$(\d+)\s*=\s*(.+)$", re.MULTILINE)
+
+
+def _snapshot_from_body(body: str, watch_exprs: list[str] | None = None) -> dict[str, Any]:
     frames = _parse_frames(body)
     frame = frames[0] if frames else {}
+    values: dict[str, str] = {}
+    if watch_exprs:
+        # record 块内逐条 `p <expr>` 输出 `$N = value`，与声明顺序一一对应
+        for index, match in enumerate(VALUE_RE.finditer(body)):
+            if index < len(watch_exprs):
+                values[watch_exprs[index]] = match.group(2).strip()
     return {
         "frame": frame,
         "locals": _parse_variables(body),
         "regs": _parse_registers(body),
+        "values": values,
         "source_location": frame.get("location", ""),
     }
 
@@ -333,7 +354,7 @@ def _load_events(debug_dir: Path, tail: int | None = None) -> list[dict[str, Any
 
 def _update_hits(debug_dir: Path, events: list[dict[str, Any]]) -> None:
     items, next_id = _load_breakpoints(debug_dir)
-    ts = now_iso()
+    ts = now_iso_ms()
     changed = False
     for event in events:
         bp_id = event.get("bp_id")
@@ -484,13 +505,14 @@ def cmd_break(args: argparse.Namespace, session: dict[str, Any], started_at: str
         spec = args.spec
         cond = args.cond or None
         mode = args.mode
-        ts = now_iso()
+        watch_exprs = list(args.watch_expr or [])
+        ts = now_iso_ms()
 
         if args.id is not None:
             target = next((item for item in items if item.get("id") == args.id), None)
             if target is None:
                 raise ValueError(f"断点 id={args.id} 不存在")
-            target.update({"spec": spec, "cond": cond, "mode": mode})
+            target.update({"spec": spec, "cond": cond, "mode": mode, "watch_exprs": watch_exprs})
             bp_id = args.id
         else:
             bp_id = next_id
@@ -501,6 +523,7 @@ def cmd_break(args: argparse.Namespace, session: dict[str, Any], started_at: str
                     "spec": spec,
                     "cond": cond,
                     "mode": mode,
+                    "watch_exprs": watch_exprs,
                     "hits": 0,
                     "created_at": ts,
                     "last_hit_at": None,
@@ -610,7 +633,12 @@ def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, 
     gdb_proc, gdb_port, server_output = _start_gdbserver(session)
     procs: list[Any] = [gdb_proc]
     try:
-        cmds = build_replay_commands(items, with_record=True, stop_after=args.stop_after)
+        cmds = []
+        if args.reset:
+            # monitor reset 会触发 VC_CORERESET 向量捕获：continue 立即收到 SIGTRAP 停住。
+            # handle SIGTRAP nostop 放行（hbreak 命中是 T05 停止包，不受影响）。
+            cmds = ["monitor reset", "handle SIGTRAP nostop noprint pass"]
+        cmds += build_replay_commands(items, with_record=True, stop_after=args.stop_after)
         cmds.append("set $_agent_hits = 0")
         cmds.append("continue")
         cmds.append(f'printf "{FINAL_MARKER}"')
@@ -622,16 +650,20 @@ def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, 
         cleanup(procs)
 
     stdout = res.get("stdout", "")
+    # bp_id -> watch_exprs 映射（record 事件快照按断点声明采集 values）
+    exprs_by_bp = {
+        int(item.get("id", 0)): list(item.get("watch_exprs") or []) for item in items
+    }
     events: list[dict[str, Any]] = []
     for bp_id, body in _split_record_events(stdout):
-        event = {"ts": now_iso(), "type": "bp-hit", "bp_id": bp_id}
-        event.update(_snapshot_from_body(body))
+        event = {"ts": now_iso_ms(), "type": "bp-hit", "bp_id": bp_id}
+        event.update(_snapshot_from_body(body, exprs_by_bp.get(bp_id)))
         events.append(event)
 
     bp_map = _parse_bp_map(stdout)
     final_part = stdout.split(FINAL_MARKER, 1)
     if len(final_part) == 2 and final_part[1].strip():
-        snap = _snapshot_from_body(final_part[1])
+        snap = _snapshot_from_body(final_part[1], exprs_by_bp.get(-1))
         # 停止原因溯源：record 块内停止路径会打 agent-stop bp=N；
         # stop 断点命中则依赖 "Breakpoint N," 行（非 silent，正常打印）
         stop_match = AGENT_STOP_RE.search(final_part[0])
@@ -653,7 +685,7 @@ def cmd_run(args: argparse.Namespace, session: dict[str, Any], started_at: str, 
             )
         if not duplicate:
             event = {
-                "ts": now_iso(),
+                "ts": now_iso_ms(),
                 "type": "bp-hit" if bp_id is not None else "halt",
                 "bp_id": bp_id,
             }
@@ -711,7 +743,7 @@ def cmd_step(args: argparse.Namespace, session: dict[str, Any], started_at: str,
         cleanup(procs)
 
     snap = _snapshot_from_body(res.get("stdout", ""))
-    event = {"ts": now_iso(), "type": "step", "bp_id": None}
+    event = {"ts": now_iso_ms(), "type": "step", "bp_id": None}
     event.update(snap)
     if not _acquire_lock(debug_dir):
         raise OSError("状态文件被占用，请稍后重试")
@@ -823,6 +855,101 @@ def cmd_events(args: argparse.Namespace, session: dict[str, Any], started_at: st
     )
 
 
+def cmd_trace(args: argparse.Namespace, session: dict[str, Any], started_at: str, started_ts: float) -> dict:
+    """从事件时间线导出变量轨迹 CSV（values 列，由断点 --watch-expr 采集）。"""
+    debug_dir = session["debug_dir"]
+    events = _load_events(debug_dir, None)
+    if not events:
+        raise ValueError("事件时间线为空，先 break（带 --watch-expr）+ run 采集后导出")
+
+    want = [e.strip() for e in args.expr.split(",")] if args.expr else []
+    keys: list[str] = []
+    for event in events:
+        for key in (event.get("values") or {}):
+            if key not in keys and (not want or key in want):
+                keys.append(key)
+    if not keys:
+        raise ValueError("事件中无 values 数据（断点需 --watch-expr 声明变量采集）")
+
+    def esc(cell: str) -> str:
+        return '"' + cell.replace('"', '""') + '"' if ("," in cell or '"' in cell) else cell
+
+    rows = ["ts,type,bp_id," + ",".join(esc(k) for k in keys)]
+    for event in events:
+        vals = event.get("values") or {}
+        if not vals:
+            continue
+        row = [str(event.get("ts", "")), str(event.get("type", "")), str(event.get("bp_id") or "")]
+        row.extend(vals.get(key, "") for key in keys)
+        rows.append(",".join(esc(c) for c in row))
+
+    if args.output:
+        out_path = Path(args.output)
+    else:
+        stamp = now_iso_ms().replace(":", "-").replace("+", "_")
+        out_path = debug_dir / f"trace_{stamp}.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    return make_result(
+        status="ok",
+        action="trace",
+        summary=f"轨迹已导出 {len(rows) - 1} 行（{len(keys)} 个变量）",
+        details={"output": str(out_path), "columns": keys, "rows": len(rows) - 1, "events": len(events)},
+        context=_session_context(session),
+        metrics={"rows": len(rows) - 1, "columns": len(keys)},
+        timing=make_timing(started_at, (time.time() - started_ts) * 1000),
+    )
+
+
+def cmd_serve(args: argparse.Namespace, session: dict[str, Any], started_at: str, started_ts: float) -> dict:
+    """静态服务 build/debug/（面板页 + 事件/断点数据），人类监督时打开浏览器。"""
+    import shutil
+    import threading
+    from functools import partial
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+    debug_dir = session["debug_dir"]
+    panel_src = SCRIPT_DIR / "debug_panel.html"
+    if not panel_src.exists():
+        raise ValueError(f"面板文件不存在: {panel_src}")
+    index = debug_dir / "index.html"
+    shutil.copyfile(panel_src, index)
+
+    port = args.port
+    handler = partial(SimpleHTTPRequestHandler, directory=str(debug_dir))
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    url = f"http://127.0.0.1:{port}/index.html"
+    print(f"监督面板已启动: {url}（Ctrl+C 退出）")
+    if not args.no_browser:
+        try:
+            import webbrowser
+
+            webbrowser.open(url)
+        except OSError:
+            pass
+    httpd.timeout = 0.5
+    deadline = None if args.timeout <= 0 else time.time() + args.timeout
+    try:
+        while True:
+            httpd.handle_request()
+            if deadline is not None and time.time() > deadline:
+                break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+
+    return make_result(
+        status="ok",
+        action="serve",
+        summary=f"面板服务结束（{url}）",
+        details={"url": url, "directory": str(debug_dir)},
+        context=_session_context(session),
+        timing=make_timing(started_at, (time.time() - started_ts) * 1000),
+    )
+
+
 def cmd_clear(args: argparse.Namespace, session: dict[str, Any], started_at: str, started_ts: float) -> dict:
     debug_dir = session["debug_dir"]
     if not _acquire_lock(debug_dir):
@@ -860,16 +987,25 @@ def build_parser() -> argparse.ArgumentParser:
             sub_parser.add_argument("--cond", default=None, help="条件表达式，如 g_sysmon_beat == 3")
             sub_parser.add_argument("--mode", choices=("record", "stop"), default="record", help="命中行为：record=自动快照+继续；stop=停下")
             sub_parser.add_argument("--id", type=int, default=None, help="更新指定 id 的断点（缺省则新增）")
+            sub_parser.add_argument("--watch-expr", action="append", default=None, help="声明变量采集（可多次）：命中快照时逐条 p 求值并写入事件 values")
         elif name == "delete":
             sub_parser.add_argument("--id", type=int, default=None, help="删除指定 id")
             sub_parser.add_argument("--all", action="store_true", help="删除全部")
         elif name == "run":
             sub_parser.add_argument("--timeout", type=int, default=30, help="运行超时秒数（默认 30）")
             sub_parser.add_argument("--stop-after", type=int, default=1, help="收集 N 个命中事件后停止（0=不限制）")
+            sub_parser.add_argument("--reset", action="store_true", help="运行前先复位目标（确定性起点，BSS 清零）")
+        elif name == "trace":
+            sub_parser.add_argument("--expr", default=None, help="要导出的变量名，逗号分隔（默认导出全部 values 键）")
+            sub_parser.add_argument("--output", default=None, help="CSV 输出路径（默认 build/debug/trace_<ts>.csv）")
         elif name in ("step", "next", "finish"):
             sub_parser.add_argument("--timeout", type=int, default=30, help="执行超时秒数（默认 30）")
         elif name == "reset":
             sub_parser.add_argument("--run", action="store_true", help="复位后立即恢复运行（默认复位后 halt）")
+        elif name == "serve":
+            sub_parser.add_argument("--port", type=int, default=8765, help="HTTP 端口（默认 8765）")
+            sub_parser.add_argument("--timeout", type=int, default=0, help="服务秒数，0=永久（默认）")
+            sub_parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
         elif name == "events":
             sub_parser.add_argument("--tail", type=int, default=None, help="只显示尾部 N 条（默认全部）")
     return parser
@@ -938,6 +1074,10 @@ def main() -> None:
             result = cmd_status(args, session, started_at, started_ts)
         elif args.command == "reset":
             result = cmd_reset(args, session, started_at, started_ts)
+        elif args.command == "trace":
+            result = cmd_trace(args, session, started_at, started_ts)
+        elif args.command == "serve":
+            result = cmd_serve(args, session, started_at, started_ts)
         elif args.command == "events":
             result = cmd_events(args, session, started_at, started_ts)
         elif args.command == "clear":
@@ -973,6 +1113,10 @@ def main() -> None:
             _print_events(details.get("events", []))
         elif args.command == "events":
             _print_events(details.get("events", []))
+        elif args.command == "trace":
+            print(f"  output: {details.get('output')}")
+        elif args.command == "serve":
+            print(f"  {details.get('url')}")
         elif args.command == "status":
             frame = details.get("frame", {})
             print(f"  PC: {frame.get('address', '?')}  {frame.get('function', '?')} @ {details.get('source_location', '?')}")

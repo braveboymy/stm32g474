@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J-Link Debug Agent</title>
+<style>
+  /* ============ 深色监控风主题（零外部依赖） ============ */
+  :root {
+    --bg: #0d1117;          /* 主背景 */
+    --bg-panel: #161b22;    /* 面板背景 */
+    --bg-hover: #1c2129;    /* 悬停背景 */
+    --border: #30363d;      /* 边框 */
+    --text: #c9d1d9;        /* 主文字 */
+    --text-dim: #8b949e;    /* 次要文字 */
+    --text-faint: #6e7681;  /* 更弱文字 */
+    --accent: #58a6ff;      /* 强调蓝 */
+    --green: #3fb950;       /* bp-hit */
+    --orange: #d29922;      /* halt */
+    --blue: #79c0ff;        /* step */
+    --gray: #8b949e;        /* run */
+    --red: #f85149;         /* reset */
+    --mono: "Consolas", "JetBrains Mono", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 13px; height: 100vh; display: flex; flex-direction: column;
+  }
+
+  /* ---------- 顶部状态条 ---------- */
+  #status-bar {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+  }
+  #status-bar h1 { font-size: 15px; color: var(--accent); letter-spacing: 0.5px; }
+  .stat { display: flex; align-items: baseline; gap: 6px; }
+  .stat .label { color: var(--text-dim); font-size: 12px; }
+  .stat .value { font-family: var(--mono); color: var(--text); font-weight: 600; }
+  #status-msg { color: var(--text-faint); font-size: 12px; }
+  #refresh-group { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  #refresh-group label { color: var(--text-dim); font-size: 12px; }
+  select, button {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 8px; font-size: 12px; cursor: pointer;
+  }
+  button:hover { background: var(--bg-hover); }
+  button.active { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- 主区域两栏 ---------- */
+  #main { flex: 1; display: flex; min-height: 0; }
+  .col { overflow-y: auto; padding: 12px; }
+  #left { width: 320px; min-width: 260px; border-right: 1px solid var(--border); background: var(--bg-panel); }
+  #right { flex: 1; }
+  .col-title { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+  /* ---------- 断点表 ---------- */
+  #bp-table { width: 100%; border-collapse: collapse; }
+  #bp-table th {
+    text-align: left; font-size: 11px; color: var(--text-faint);
+    padding: 4px 6px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg-panel);
+  }
+  #bp-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; vertical-align: top; }
+  #bp-table tr.bp-idle td { opacity: 0.45; }       /* hits=0 断点加灰 */
+  #bp-table tr:hover td { background: var(--bg-hover); }
+  .bp-spec { word-break: break-all; }
+  .bp-cond { color: var(--text-dim); font-size: 11px; }
+  .mode-tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; }
+  .mode-record { color: var(--green); border: 1px solid var(--green); }
+  .mode-stop { color: var(--orange); border: 1px solid var(--orange); }
+
+  /* ---------- 事件时间线 ---------- */
+  #timeline { display: flex; flex-direction: column; gap: 6px; }
+  .event {
+    background: var(--bg-panel); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .event-head {
+    display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+    cursor: pointer; flex-wrap: wrap;
+  }
+  .event-head:hover { background: var(--bg-hover); }
+  .event-time { font-family: var(--mono); color: var(--text-dim); font-size: 11px; }
+  .badge {
+    font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 8px;
+    text-transform: uppercase; letter-spacing: 0.5px; color: #0d1117;
+  }
+  .b-bp-hit { background: var(--green); }
+  .b-halt { background: var(--orange); }
+  .b-step { background: var(--blue); }
+  .b-run { background: var(--gray); }
+  .b-reset { background: var(--red); }
+  .b-unknown { background: var(--gray); }
+  .event-func { font-family: var(--mono); color: var(--text); font-weight: 600; }
+  .event-loc { font-family: var(--mono); color: var(--text-dim); font-size: 11px; }
+  .event-bp { color: var(--accent); font-family: var(--mono); font-size: 11px; }
+
+  /* 详情区（点击展开） */
+  .event-body { display: none; border-top: 1px solid var(--border); padding: 10px; }
+  .event.open .event-body { display: block; }
+  .kv-title { font-size: 11px; color: var(--text-dim); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  table.kv { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.kv td {
+    font-family: var(--mono); font-size: 11px; padding: 2px 8px;
+    border: 1px solid var(--border);
+  }
+  table.kv td.k { width: 180px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  table.kv td.v { color: var(--text); word-break: break-all; }
+  .opt-out { color: var(--text-faint); font-style: italic; }   /* <optimized out> 灰斜体 */
+  table.kv td.v.val-high { color: var(--accent); font-weight: 600; }  /* values 核心数据高亮 */
+
+  /* ---------- 空/等待提示 ---------- */
+  .hint { color: var(--text-faint); font-size: 12px; padding: 12px; text-align: center; }
+
+  @media (max-width: 800px) {
+    #main { flex-direction: column; }
+    #left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+  <!-- 顶部状态条 -->
+  <div id="status-bar">
+    <h1>J-Link Debug Agent</h1>
+    <div class="stat"><span class="label">断点</span><span class="value" id="st-bp">-</span></div>
+    <div class="stat"><span class="label">命中合计</span><span class="value" id="st-hits">-</span></div>
+    <div class="stat"><span class="label">事件</span><span class="value" id="st-events">-</span></div>
+    <div class="stat"><span class="label">最近事件</span><span class="value" id="st-last">-</span></div>
+    <span id="status-msg"></span>
+    <div id="refresh-group">
+      <label for="interval">刷新</label>
+      <select id="interval">
+        <option value="1000">1s</option>
+        <option value="2000" selected>2s</option>
+        <option value="5000">5s</option>
+      </select>
+      <button id="btn-pause">暂停</button>
+    </div>
+  </div>
+
+  <!-- 两栏主体 -->
+  <div id="main">
+    <div id="left" class="col">
+      <div class="col-title">断点表（breakpoints.json）</div>
+      <table id="bp-table">
+        <thead><tr><th>id</th><th>mode</th><th>hits</th><th>spec / cond</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="bp-hint" class="hint">等待数据…</div>
+    </div>
+    <div id="right" class="col">
+      <div class="col-title">事件时间线（events.jsonl，最新在上）</div>
+      <div id="timeline"></div>
+      <div id="ev-hint" class="hint">等待数据…</div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+/* ============================================================================
+ * J-Link Debug Agent 监督面板（单文件、零依赖）
+ * 数据源（相对路径，与面板同目录）：
+ *   - breakpoints.json：断点表
+ *   - events.jsonl：    事件时间线（每行一个 JSON）
+ * 功能：定时轮询、增量渲染、断点状态、事件详情（locals/regs/values）
+ * ==========================================================================*/
+
+const EVENTS_URL = 'events.jsonl';
+const BREAKPOINTS_URL = 'breakpoints.json';
+
+let pollTimer = null;          // 轮询定时器句柄
+let paused = false;           // 暂停标志
+let knownEventTs = new Set(); // 已渲染事件的时间戳集合（增量渲染去重）
+let lastEventsHash = '';      // 事件文件哈希缓存（避免重复解析）
+
+/* ---------------- 工具函数 ---------------- */
+
+/** 带缓存穿透的 fetch：追加时间戳查询参数，避免浏览器缓存旧文件 */
+function fetchFresh(url) {
+  return fetch(url + '?_ts=' + Date.now(), { cache: 'no-store' }).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  });
+}
+
+/** 简单非加密哈希（FNV-1a）：用于快速判断事件文件是否变化 */
+function hashString(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** 解析 ISO 时间戳为毫秒数；失败返回 0 */
+function parseTs(ts) {
+  const t = Date.parse(ts);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** 转义 HTML，防止注入 */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** 类型徽章 class 名（未知类型回退灰色） */
+function badgeClass(type) {
+  const map = { 'bp-hit': 'b-bp-hit', 'halt': 'b-halt', 'step': 'b-step', 'run': 'b-run', 'reset': 'b-reset' };
+  return map[type] || 'b-unknown';
+}
+
+/* ---------------- 状态条 ---------------- */
+
+/** 刷新顶部统计 */
+function updateStatusBar(bpCount, hitsTotal, eventCount, lastTs) {
+  document.getElementById('st-bp').textContent = bpCount;
+  document.getElementById('st-hits').textContent = hitsTotal;
+  document.getElementById('st-events').textContent = eventCount;
+  document.getElementById('st-last').textContent = lastTs ? lastTs : '-';
+}
+
+/* ---------------- 断点表渲染 ---------------- */
+
+/** 渲染断点表（整体重建，数据量小） */
+function renderBreakpoints(items) {
+  const tbody = document.querySelector('#bp-table tbody');
+  tbody.innerHTML = '';
+  const hint = document.getElementById('bp-hint');
+  if (!items || items.length === 0) {
+    hint.style.display = '';
+    return;
+  }
+  hint.style.display = 'none';
+  for (const bp of items) {
+    const tr = document.createElement('tr');
+    if (!bp.hits) tr.className = 'bp-idle';                 // hits=0 加灰
+    const modeClass = bp.mode === 'record' ? 'mode-record' : 'mode-stop';
+    tr.innerHTML =
+      '<td>' + esc(bp.id) + '</td>' +
+      '<td><span class="mode-tag ' + modeClass + '">' + esc(bp.mode) + '</span></td>' +
+      '<td>' + esc(bp.hits) + '</td>' +
+      '<td><div class="bp-spec">' + esc(bp.spec) + '</div>' +
+      (bp.cond ? '<div class="bp-cond">if ' + esc(bp.cond) + '</div>' : '') +
+      (bp.last_hit_at ? '<div class="bp-cond">last: ' + esc(bp.last_hit_at) + '</div>' : '') +
+      '</td>';
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------------- 事件时间线渲染 ---------------- */
+
+/** 键值表渲染：k/v 行，optOut 标记 <optimized out>，highLight 用于 values 高亮 */
+function kvTableHtml(pairs, optOut, highLight) {
+  const rows = Object.entries(pairs || {})
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => {
+      const sv = String(v);
+      let cls = '';
+      if (optOut && /optimized out/i.test(sv)) cls = ' class="opt-out"';
+      else if (highLight) cls = ' class="v val-high"';
+      return '<tr><td class="k">' + esc(k) + '</td><td' + cls + '>' + esc(sv) + '</td></tr>';
+    })
+    .join('');
+  return rows ? '<table class="kv">' + rows + '</table>' : '<div class="hint">（无）</div>';
+}
+
+/** 寄存器筛选：只显示 pc/sp/r0-r12/lr/xpsr，其余折叠进「全部寄存器」 */
+function regsTables(regs) {
+  if (!regs || Object.keys(regs).length === 0) return '<div class="hint">（无）</div>';
+  const isMain = k => /^(pc|sp|lr|xpsr|r([0-9]|1[0-2])|msp|psp)$/i.test(k);
+  const main = {}, rest = {};
+  for (const [k, v] of Object.entries(regs)) {
+    (isMain(k) ? main : rest)[k] = v;
+  }
+  let html = kvTableHtml(main, false, false);
+  if (Object.keys(rest).length > 0) {
+    html += '<div class="kv-title">全部寄存器</div>' + kvTableHtml(rest, false, false);
+  }
+  return html;
+}
+
+/** 单条事件 HTML（展开时显示详情） */
+function eventHtml(ev) {
+  const frame = ev.frame || {};
+  const bpTag = ev.bp_id != null ? '<span class="event-bp">bp=' + esc(ev.bp_id) + '</span>' : '';
+  const loc = frame.location || ev.source_location || '';
+  return (
+    '<div class="event">' +
+      '<div class="event-head">' +
+        '<span class="event-time">' + esc(ev.ts || '') + '</span>' +
+        '<span class="badge ' + badgeClass(ev.type) + '">' + esc(ev.type || '?') + '</span>' +
+        bpTag +
+        '<span class="event-func">' + esc(frame.function || '??') + '</span>' +
+        '<span class="event-loc">' + esc(loc) + '</span>' +
+      '</div>' +
+      '<div class="event-body">' +
+        '<div class="kv-title">局部变量（locals）</div>' + kvTableHtml(ev.locals, true, false) +
+        '<div class="kv-title">跟踪变量（values）</div>' + kvTableHtml(ev.values, false, true) +
+        '<div class="kv-title">寄存器（registers）</div>' + regsTables(ev.regs) +
+      '</div>' +
+    '</div>'
+  );
+}
+
+/** 增量渲染：仅插入新事件到顶部（按时间倒序），保留已有 DOM */
+function renderEvents(events) {
+  const timeline = document.getElementById('timeline');
+  const hint = document.getElementById('ev-hint');
+  if (!events || events.length === 0) {
+    hint.style.display = '';
+    return;
+  }
+  hint.style.display = 'none';
+
+  // 按 ts 升序处理，逐个判断是否已渲染
+  const sorted = events.slice().sort((a, b) => parseTs(a.ts) - parseTs(b.ts));
+  let newest = null;
+  for (const ev of sorted) {
+    const key = ev.ts + '|' + (ev.type || '') + '|' + (ev.bp_id != null ? ev.bp_id : '');
+    if (knownEventTs.has(key)) continue;      // 已渲染，跳过
+    knownEventTs.add(key);
+    const div = document.createElement('div');
+    div.innerHTML = eventHtml(ev);
+    const evEl = div.firstChild;
+    // 点击头展开/收起详情
+    evEl.querySelector('.event-head').addEventListener('click', () => evEl.classList.toggle('open'));
+    // 时间倒序：最新插入最前面
+    timeline.prepend(evEl);
+    newest = ev.ts || newest;
+  }
+  return newest;
+}
+
+/* ---------------- 轮询主流程 ---------------- */
+
+/** 一次轮询：拉取两个文件并渲染；任一文件缺失/解析失败仅提示，不报错 */
+async function poll() {
+  let msg = '';
+  try {
+    // —— 事件文件 ——
+    let events = [];
+    let newestTs = null;
+    try {
+      const text = await fetchFresh(EVENTS_URL);
+      const h = hashString(text);
+      if (h !== lastEventsHash) {           // 文件变化才解析
+        lastEventsHash = h;
+        events = text.split('\n')
+          .map(line => line.trim())
+          .filter(Boolean)
+          .map(line => {
+            try { return JSON.parse(line); } catch (e) { return null; }
+          })
+          .filter(e => e !== null);
+        newestTs = renderEvents(events);
+      }
+    } catch (e) {
+      msg = '等待事件数据…';
+    }
+
+    // —— 断点文件 ——
+    let bpCount = 0, hitsTotal = 0;
+    try {
+      const text = await fetchFresh(BREAKPOINTS_URL);
+      const data = JSON.parse(text);
+      const items = (data && data.items) || [];
+      bpCount = items.length;
+      hitsTotal = items.reduce((s, b) => s + (b.hits || 0), 0);
+      renderBreakpoints(items);
+    } catch (e) {
+      msg = msg || '等待断点数据…';
+    }
+
+    // 事件总数：以已知事件集合为准（跨轮询累计）
+    const evCount = knownEventTs.size;
+    updateStatusBar(bpCount, hitsTotal, evCount, newestTs);
+  } catch (e) {
+    msg = '读取失败: ' + (e && e.message ? e.message : String(e));
+  }
+  document.getElementById('status-msg').textContent = msg;
+}
+
+/* ---------------- 定时器与控件 ---------------- */
+
+function startPolling() {
+  const intervalMs = parseInt(document.getElementById('interval').value, 10) || 2000;
+  stopPolling();
+  poll();                                     // 立即刷一次
+  pollTimer = setInterval(() => { if (!paused) poll(); }, intervalMs);
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+/* 刷新间隔切换：重置定时器 */
+document.getElementById('interval').addEventListener('change', startPolling);
+
+/* 暂停/恢复按钮 */
+const btnPause = document.getElementById('btn-pause');
+btnPause.addEventListener('click', () => {
+  paused = !paused;
+  btnPause.textContent = paused ? '继续' : '暂停';
+  btnPause.classList.toggle('active', paused);
+});
+
+/* 启动 */
+startPolling();
+</script>
+</body>
+</html>

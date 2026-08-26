@@ -55,14 +55,19 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py verify
 断点/事件持久化在 `build/debug/`，每次命令独立会话但状态跨命令存续，适合 LLM 全自动调试：
 
 ```bash
-dev.py debug break --spec "task_sysmon.c:54" --cond "g_sysmon_beat == 3" --mode record
+dev.py debug break --spec "task_sysmon.c:54" --cond "g_sysmon_beat == 3" --mode record \
+    --watch-expr g_sysmon_beat --watch-expr sys_freq
 #     record=命中自动快照+继续（写入 events.jsonl）；stop=命中即停
-dev.py debug run --stop-after 2 --timeout 30   # 重放断点，收集 N 个事件后停止
+#     --watch-expr 可多次：命中时对变量逐条 p 求值，写入事件 values（供 trace 导出）
+dev.py debug run --stop-after 2 --timeout 30 [--reset]   # 重放断点，收集 N 个事件后停止
+#     --reset：运行前先复位目标（BSS 清零，条件断点从确定性起点开始）
 dev.py debug step|next|finish                  # 单步/越过/运行到返回
 dev.py debug reset [--run]                     # 复位目标（默认 halt；--run 恢复运行）
 dev.py debug status                            # 目标当前 PC/帧/寄存器
 dev.py debug list|delete --id N|clear          # 断点管理
-dev.py debug events --tail 10                  # 回查事件时间线（每行含 frame/locals/regs 快照）
+dev.py debug events --tail 10                  # 回查事件时间线（每行含 frame/locals/regs/values 快照）
+dev.py debug trace [--expr g_sysmon_beat]      # 变量轨迹导出 CSV（来自事件 values，可过滤列）
+dev.py debug serve [--port 8765]               # Web 监督面板（静态页实时渲染断点/事件）
 ```
 
 注意事项：
