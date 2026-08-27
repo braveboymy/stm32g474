@@ -24,7 +24,7 @@ description: >-
 └── templates/          # 新项目脚手架：devtool.conf.example / githooks（pre-commit 单一真源）
 项目根/
 ├── devtool.conf        # 项目配置（设备/分区/bin/构建/MISRA/单测）
-└── tools/              # 项目特定工具（fetch_third_party.sh / scenarios）
+└── tools/              # 项目特定工具（scenarios 回归场景）
 ```
 
 pre-commit 钩子**单一真源**在 `templates/githooks/`（hooksPath 直接指向它，
@@ -143,4 +143,4 @@ value-range=全部采集值在 [gte,lte]（无采集判不过）。任何断言�
 - LLM 调试代理全文：`docs/debug-agent.md`（命令/数据格式/踩坑记录/路线图）
 - 项目配置：项目根 `devtool.conf`（设备/分区/bin/构建/MISRA/单测参数，引擎读取）
 - 多项目复用：新项目跑 `bash scripts/install_devtools.sh`，改 devtool.conf 即可；
-  项目特定脚本留在项目 tools/（如 `tools/fetch_third_party.sh` 依赖锁定、`tools/scenarios/` 回归场景）
+  项目特定脚本留在项目 tools/（如 `tools/scenarios/` 回归场景；依赖已裁剪入库）
