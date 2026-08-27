@@ -1,0 +1,42 @@
+{
+  "_comment": "devtools skill 项目配置。复制为项目根 devtool.conf 后按实际填写；路径均相对项目根。",
+  "project": "你的项目名",
+  "build": {
+    "dir": "build",
+    "generator": "Ninja",
+    "toolchain": "cmake/toolchain-arm-none-eabi.cmake"
+  },
+  "jlink": {
+    "device": "STM32G474RE",
+    "interface": "SWD",
+    "speed": "4000"
+  },
+  "bins": [
+    { "name": "bootloader", "path": "build/bin/bootloader.bin", "addr": "0x08000000" },
+    { "name": "app", "path": "build/bin/app.bin", "addr": "0x08008000" }
+  ],
+  "log": {
+    "ram_buf_size": 2048,
+    "map": "build/app.map",
+    "note": "ram_buf_size 需与固件 log 模块的 RAM 缓冲定义一致"
+  },
+  "status": {
+    "regs": [
+      ["0x40001024", "TIM6 CNT（时间基准，1kHz 递增）"]
+    ],
+    "hard_metric": "TIM6"
+  },
+  "misra": {
+    "dirs": ["core", "bsp", "app"],
+    "includes": ["-Iconfig", "-Icore"],
+    "defs": ["-DSTM32G474xx", "-DUSE_HAL_DRIVER"],
+    "_comment": "addon 可省略，默认用 skill 自带 assets/cppcheck-addons/misra.json"
+  },
+  "tests": {
+    "dirs": ["tests/core"],
+    "includes": ["core", "tests/core"],
+    "sources": {
+      "test_rb": ["tests/core/test_rb.c", "core/util/rb.c"]
+    }
+  }
+}

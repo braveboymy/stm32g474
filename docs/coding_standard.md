@@ -119,7 +119,7 @@ raw_code                 // 无单位原始值
 - 表达式加括号明确优先级（Rule 12.1）
 - 禁止 `printf/scanf` 家族（仅允许 `snprintf/vsnprintf` 用于日志，Rule 21.6）
 
-豁免清单见 AGENTS.md 4.1 表（必须可追溯），新增豁免必须登记理由。
+豁免清单见 `docs/misra_deviation.md` §2（必须可追溯），新增豁免必须登记理由。
 
 ## 6. clang-format（格式强制）
 

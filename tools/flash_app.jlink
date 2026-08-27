@@ -1,8 +1,0 @@
-// J-Link Commander 烧录脚本（由 tools/flash_jlink.sh 调用）
-// 应用固件烧录到 0x08008000（Flash 分区见 docs/flash-partition.md）
-r
-loadbin build/bin/app.bin 0x08008000
-verifybin build/bin/app.bin 0x08008000
-r
-g
-q

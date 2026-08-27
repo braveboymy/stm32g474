@@ -1,8 +1,7 @@
 # 构建产物
 /build/
 
-# 第三方代码（由 tools/fetch_third_party.sh 拉取，版本固定见 third_party/README.md）
-/third_party/
+# 第三方代码（裁剪入库，仅保留本项目用到的部分，见 third_party/README.md）
 
 # IDE
 .vscode/

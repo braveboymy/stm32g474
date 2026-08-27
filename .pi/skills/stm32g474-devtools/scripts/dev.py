@@ -11,9 +11,12 @@
   dev.py console [--list]            # 串口日志（需 ST-LINK VCP / pyserial）
   dev.py regs                        # 读取 CPU 寄存器（卡死定位）
   dev.py verify [--tail N]           # 一键闭环：build -> flash -> status -> log
+  dev.py misra [dir...]              # MISRA C:2012 检查（cppcheck addon）
+  dev.py test                        # core 层 PC 单测（host gcc）
 
 说明：
-  - 编译/烧录/状态/日志等核心操作复用 tools/devtool.py（uv 管理环境）
+  - 编译/烧录/状态/日志等核心操作复用本 skill 的 devtool.py 引擎（配置驱动，
+    项目参数见项目根 devtool.conf）
   - regs 直接走 J-Link Commander（复用 devtool 的封装）
 """
 
@@ -26,11 +29,14 @@ import sys
 import time
 from pathlib import Path
 
-# .pi/skills/<name>/scripts/dev.py -> parents[4] = 项目根
-ROOT = Path(__file__).resolve().parents[4]
-DEVTOOL = ROOT / "tools" / "devtool.py"
-sys.path.insert(0, str(ROOT / "tools"))
-import devtool  # noqa: E402  复用 J-Link 封装（run_jlink/find_tool 等）
+# .pi/skills/<name>/scripts/dev.py
+SKILL_SCRIPTS = Path(__file__).resolve().parent
+
+sys.path.insert(0, str(SKILL_SCRIPTS))
+import devtool  # noqa: E402  复用引擎（run_jlink/find_tool/配置）
+
+ROOT = devtool.ROOT
+DEVTOOL = SKILL_SCRIPTS / "devtool.py"
 
 
 def python_cmd() -> list[str]:
@@ -107,8 +113,8 @@ def main() -> int:
         print(__doc__)
         return 1
 
-    # 透传子命令：第一个参数是命令名，其余参数原样转给 tools/devtool.py
-    passthrough = ("info", "build", "flash", "connect", "status", "log", "console", "test")
+    # 透传子命令：第一个参数是命令名，其余参数原样转给 devtool.py 引擎
+    passthrough = ("info", "build", "flash", "connect", "status", "log", "console", "test", "misra")
     if sys.argv[1] in passthrough:
         return devtool_run([sys.argv[1]] + sys.argv[2:])
 

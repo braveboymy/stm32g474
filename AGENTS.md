@@ -16,12 +16,10 @@
 
 ## 2. 开发闭环（必须使用，禁止臆造命令）
 
-所有编译/烧录/调试/日志操作必须走项目脚本：
+所有编译/烧录/调试/日志/MISRA/单测操作必须先查项目脚本，命令全集见 `.pi/skills/stm32g474-devtools/SKILL.md`：
 
 ```bash
-python .pi/skills/stm32g474-devtools/scripts/dev.py build|flash|status|log|regs|verify|test
-# 等价底层：uv run python tools/devtool.py <cmd>；烧录 J-Link SWD 4MHz
-# test：core 层 PC 单测（rb/log，host gcc 无需硬件，见 tools/run_core_tests.sh）
+python .pi/skills/stm32g474-devtools/scripts/dev.py build|flash|status|log|regs|verify|test|misra
 ```
 
 - 修改代码后**必须** `dev.py build` 验证编译通过
@@ -36,52 +34,27 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py build|flash|status|log|regs|
 - **头文件**：必须 include guard（`#ifndef XXX_H`）；头文件只放声明与文档，实现细节留在 .c
 - **分层纪律**：core/ 禁止依赖 bsp/ 与 HAL（硬件无关，PC 可单测）；业务代码只经 osal/ 访问 RTOS
 - **静态分析**：除 MISRA 外，代码应无 `-Wall -Wextra` 警告
+- **格式**：遵循 `.clang-format`（提交时自动检查，可先 `clang-format -i` 再提交）
 
 ## 4. MISRA C:2012 强制要求（必须满足）
 
 **所有本项目代码（app/core/bsp/bootloader，第三方豁免）必须通过 MISRA 检查：**
 
 ```bash
-bash tools/check_misra.sh          # 全量
-bash tools/check_misra.sh <路径>    # 单目录/文件
+python .pi/skills/stm32g474-devtools/scripts/dev.py misra         # 全量
+python .pi/skills/stm32g474-devtools/scripts/dev.py misra <路径>   # 单目录/文件
 ```
 
 ### 4.1 强制规则子集（豁免清单 = 检查工具自动跳过）
 
-以下规则因嵌入式/RTOS 生态原因**项目级豁免**（理由必须可追溯，见下表）：
-
-| 豁免规则 | 理由 |
-|---|---|
-| 2.1-2.7 | 未使用代码/注释：编译器 -Wall 已覆盖；HAL 死代码噪音 |
-| 3.x, 4.x | 注释风格、字符集（advisory） |
-| 5.1-5.9 | 标识符唯一性/长度：HAL/FreeRTOS 风格 |
-| 6.x, 7.x | 位字段、常量细节（未使用/ advisory） |
-| 8.4 | 框架回调原型在第三方头（FreeRTOS/HAL 约定入口） |
-| 8.7 | 单 TU 函数 static 化：HAL 回调必须外部可见 |
-| 8.9 | static 模块私有状态（嵌入式惯例，advisory） |
-| 9.2-9.5 | 初始化细节（advisory） |
-| 10.5-10.8 | 整数类型体系细节（uint32 生态惯例） |
-| 11.1 | 函数指针转换：FreeRTOS 任务入口适配 |
-| 11.3-11.5 | 指针↔整数：寄存器/外设地址映射惯例 |
-| 14.2, 14.3 | 循环形式（advisory） |
-| 15.5 | cppcheck addon 对带表达式 return 的误报（代码审查兜底） |
-| 16.4-16.7 | switch/函数细节（advisory） |
-| 17.1 | restrict 限定（advisory） |
-| 17.3 | 隐式函数声明检测：cppcheck 宏展开误报，-Wall 兜底 |
-| 17.7 | 返回值必须使用：FreeRTOS API 忽略返回值是惯例 |
-| 17.8 | 不得修改参数：out 参数是嵌入式惯例 |
-| 20.10 | `#`/`##` 宏运算符：HAL 大量使用 |
-| 21.2 | 保留标识符：HAL/FreeRTOS 下划线前缀 |
-| 21.6 | stdio：**仅允许** snprintf/vsnprintf 用于日志格式化；禁止 printf/scanf 家族 |
-| 22.1 | 动态内存：FreeRTOS heap_4 是平台机制（禁止业务代码自建 malloc） |
-
-豁免规则之外的违规**必须清零**。三条途径（按优先级）：
+豁免规则与理由见 [`docs/misra_deviation.md`](docs/misra_deviation.md)（与 cppcheck addon 配置一一对应）。
+豁免之外的违规**必须清零**。三条途径（按优先级）：
 1. **修复代码**（首选）
 2. **行内豁免**（仅限合理场景，必须带原因）：
    ```c
    // cppcheck-suppress misra-c2012-10.4  原因：<一句话理由>
    ```
-3. **补充豁免表**（涉及整类场景时，需在 4.1 表中登记理由，不得静默豁免）
+3. **补充豁免表**（涉及整类场景时，需在 misra_deviation.md 中登记理由，不得静默豁免）
 
 ### 4.2 MISRA 高频违规点（本工程实测，写代码时直接规避）
 
@@ -108,7 +81,6 @@ bash tools/check_misra.sh <路径>    # 单目录/文件
 
 ## 6. 提交要求
 
-- **pre-commit 钩子已启用**（`tools/githooks/pre-commit`，安装：`bash tools/install_hooks.sh`）：
-  提交前自动执行 `dev.py build` + `bash tools/check_misra.sh`，失败则阻止提交
+- **pre-commit 已启用**：提交自动执行 `dev.py build` + `dev.py test` + `dev.py misra` + 格式检查，失败阻止提交
 - 紧急跳过：`SKIP_CHECKS=1 git commit ...` 或 `git commit --no-verify`（事后必须补跑检查）
 - 硬件行为改动注明验证方式（`dev.py verify` 输出 / RAM 日志证据）

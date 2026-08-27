@@ -15,7 +15,7 @@ argument-hint: "[env|build|flash|debug|test|misra|full] ..."
 实现"写代码 → 生成固件 → 烧录 → 验证 → 单测 → MISRA 检测"的无人工干预闭环。
 
 **命令入口优先使用项目脚本**（AGENTS.md 强制）：
-`stm32g474-devtools/scripts/dev.py` 为通用便捷入口（等价底层 `tools/devtool.py`）。
+`stm32g474-devtools/scripts/dev.py` 为统一入口（引擎 `scripts/devtool.py` 读项目根 `devtool.conf`）。
 
 ## 0. 环境自检（首次使用必做）
 
@@ -69,13 +69,10 @@ LLM 的处理规则：
 # 推荐（项目脚本，默认 Release；也可 Debug）
 uv run python .pi/skills/stm32g474-devtools/scripts/dev.py build
 uv run python .pi/skills/stm32g474-devtools/scripts/dev.py build Debug
-
-# 等价底层
-uv run python tools/devtool.py build
 ```
 
 - 编译失败时：读取输出中的错误详情，自行定位修复代码后重编，循环直至通过
-- 产物：`build/bin/app.bin`，路径记录到 `.embeddedskills/state.json`
+- 产物：`build/bin/app.bin`（还有个 `build/bin/bootloader.bin`）
 - 说明：本工程**无 CMakePresets.json**，embeddedskills/gcc 的 preset 功能不可用，
   仅用其 `gcc_size.py analyze` 看 ELF 大小等辅助场景
 
@@ -83,12 +80,11 @@ uv run python tools/devtool.py build
 
 ```bash
 uv run python .pi/skills/stm32g474-devtools/scripts/dev.py flash
-# 等价底层：uv run python tools/devtool.py flash
 ```
 
 - J-Link SWD 4MHz，烧录 bootloader(0x08000000) + app(0x08008000) 并校验，完成后复位运行
 - 失败时检查：先 `dev.py connect` 测 J-Link 连接；再查 SWD 接线、目标供电、芯片型号
-- 备用脚本：`tools/flash_jlink.sh` / `tools/flash_app.jlink`
+- 烧录参数（设备/分区/bin 路径）见项目根 `devtool.conf`
 
 ## 4. 在线调试与验证
 
@@ -117,7 +113,6 @@ uv run python .pi/skills/stm32g474-devtools/scripts/dev.py console
 ```bash
 # host gcc 编译运行，无需硬件
 uv run python .pi/skills/stm32g474-devtools/scripts/dev.py test
-# 等价底层：uv run python tools/devtool.py test
 ```
 
 - 改完 `core/`（osal/log/util 等硬件无关层）后必须跑单测，回归通过再固件编译
@@ -125,8 +120,8 @@ uv run python .pi/skills/stm32g474-devtools/scripts/dev.py test
 ## 6. MISRA C:2012 合规检测
 
 ```bash
-tools/check_misra.sh            # 范围 core bsp app bootloader（第三方豁免）
-tools/check_misra.sh core       # 定向目录
+python .pi/skills/stm32g474-devtools/scripts/dev.py misra           # 范围 core bsp app bootloader（第三方豁免）
+python .pi/skills/stm32g474-devtools/scripts/dev.py misra core      # 定向目录
 ```
 
 - 规则子集与豁免理由见 AGENTS.md「MISRA C:2012」章节（cppcheck --addon=misra，
@@ -147,21 +142,22 @@ tools/check_misra.sh core       # 定向目录
 3. `dev.py build` 编译 → 失败修复循环
 4. `dev.py flash` 烧录
 5. `dev.py verify` 在线验证（寄存器 + RAM 日志）
-6. `tools/check_misra.sh` MISRA 检测 → 违规修复循环
+6. `dev.py misra` MISRA 检测 → 违规修复循环
 7. 汇总报告：环境 / 单测 / 构建 / 烧录 / 验证 / MISRA 状态与整改清单
 
 每个阶段失败时：**定位 → 修复 → 重跑本阶段**，不要跳过。
 
 ## 配置
 
-工程参数在 `.embeddedskills/config.json`（已配置）：
+工程参数在项目根 `devtool.conf`（devtools 引擎统一读取）：
 - `jlink.device/interface/speed`：STM32G474RE / SWD / 4000
-- `workflow.preferred_*`：build=gcc，flash/debug/observe=jlink
-- `serial`：默认 115200（`dev.py console` 用）
+- `bins`：bootloader@0x08000000 + app@0x08008000（flash 顺序/校验）
+- `build`：Ninja + cmake/toolchain-arm-none-eabi.cmake
+- `misra`/`tests`：检查范围、include/defs、单测登记表
 
 ## 相关资源
 
 - 平台闭环 skill：`stm32g474-devtools`（scripts/dev.py 为统一入口）
 - 底层工具 skill：`embeddedskills/{gcc,jlink,keil,openocd,serial,workflow}`
-- 项目工具：`tools/devtool.py`、`tools/check_misra.sh`、`tools/build.sh`
+- 项目特定工具：`tools/fetch_third_party.sh`（依赖锁定）、`tools/scenarios/`（回归场景）
 - 架构/规则参考：`AGENTS.md`、`CONTEXT.md`、`docs/`
