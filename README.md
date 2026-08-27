@@ -73,7 +73,7 @@ python .pi/skills/stm32g474-devtools/scripts/dev.py debug    # LLM 调试代理�
 
 **工具链与配置**
 ```
-├── tools/                     # 项目特定：fetch_third_party.sh / scenarios（回归场景）
+├── tools/                     # 项目特定：scenarios（回归场景）
 ├── .pi/skills/                # 项目技能：stm32g474-devtools（开发闭环，含 pre-commit 钩子模板）/ embeddedskills（通用）
 ├── devtool.conf               # 开发工具配置（设备/分区/bin/构建/MISRA/单测）——唯一需要改的工程参数
 ├── pyproject.toml + uv.lock   # Python 工具环境清单（uv sync）
