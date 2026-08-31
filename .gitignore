@@ -18,5 +18,8 @@ __pycache__/
 *.hex
 *.map
 compile_commands.json
+
+# agentd 构建产物
+/tools/agentd/bin/
 /.embeddedskills/state.json
 *.ctu-info
