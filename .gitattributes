@@ -1,6 +1,1 @@
-# 统一换行符：源码 LF，避免 Windows 下 CRLF 噪音
-* text=auto eol=lf
-*.s text eol=lf
-*.ld text eol=lf
-*.sh text eol=lf
-*.md text eol=lf
+*.bat text eol=crlf
