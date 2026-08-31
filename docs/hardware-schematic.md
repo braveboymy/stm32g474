@@ -292,3 +292,17 @@
 | 9 | 无任何凭经验"补全"的型号/参数/连接 | ✅ 关键连接已实测定稿 + 2026-08-16 原理图复核；仅剩 ⚠️6/⚠️7 待实物核对 |
 
 **遗留问题**：剩余 ⚠️6（SPI3 扩展排针位号）、⚠️7（RST 按键位号）为实物核对类，不影响固件开发；建议补测 U3.7 HOLD 接法。本文件为引脚/硬件唯一事实源（原 pinmap.md 已删除，其 NUCLEO 段与电机预留已并入 §5.7/§8）。
+
+## 11. OLED SSD1306 扩展接线（agent 状态指示灯，2026-08-31）
+
+| 项 | 值 | 说明 |
+|---|---|---|
+| 屏 | SSD1306 128×64，I2C（0.3"~0.96" 模块均可） | 单色，像素表情显示 agent 状态 |
+| I2C | **I2C1：PB8=SCL、PB9=SDA（AF4，开漏，模块自带上拉）** | 与现有 USART2/USB/LED 无冲突 |
+| 地址 | 0x3C（模块背面 A0 电阻焊盘默认） | 若改 0x3D 需同步 board.h `BOARD_OLED_I2C_ADDR` |
+| 时钟 | 400kHz（`BOARD_OLED_I2C_TIMING`=0x042FBFCF，PCLK1=160MHz 推导） | 换 PCLK1 必须重算时序（board.h 注释） |
+| 接线 | PB8→SCL、PB9→SDA、VCC→3V3、GND→GND | I2C 规范要求开漏+外部上拉（模块已带） |
+
+固件：`bsp/oled.c`（驱动器）+ `bsp/face_data.c`（表情资产）+ `app/tasks/task_status.c`（动画引擎）。
+表情**设计与更换流程**：编辑 `tools/oled/gen_faces.py` 的参数（部件 sprite 坐标）
+→ `python tools/oled/gen_faces.py --preview` 出预览图 → 重编译固件即可，协议与桥端零改动。

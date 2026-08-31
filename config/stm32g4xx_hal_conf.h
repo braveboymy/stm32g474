@@ -58,7 +58,7 @@ extern "C" {
 /*#define HAL_SPI_MODULE_ENABLED   */  /* M3 参数存储（W25Q16）/ OLED */
 /*#define HAL_EXTI_MODULE_ENABLED  */  /* M4 CLI 按键（启用时同步加 hal_exti.c） */
 /*#define HAL_CRYP_MODULE_ENABLED  */
-/*#define HAL_I2C_MODULE_ENABLED   */
+#define HAL_I2C_MODULE_ENABLED      /* OLED SSD1306（bsp/oled.c + bsp/msp.c） */
 /*#define HAL_I2S_MODULE_ENABLED   */
 /*#define HAL_IRDA_MODULE_ENABLED  */
 /*#define HAL_LPTIM_MODULE_ENABLED */

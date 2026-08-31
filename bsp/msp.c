@@ -33,3 +33,28 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
         __HAL_RCC_USART2_CLK_DISABLE();
     }
 }
+
+void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
+{
+    if (hi2c->Instance == BOARD_OLED_I2C) {
+        GPIO_InitTypeDef g = {0};
+
+        __HAL_RCC_I2C1_CLK_ENABLE();
+        __HAL_RCC_GPIOB_CLK_ENABLE();
+
+        g.Pin = BOARD_OLED_I2C_SCL_PIN | BOARD_OLED_I2C_SDA_PIN;
+        g.Mode = GPIO_MODE_AF_OD; /* I2C 规范要求开漏 */
+        g.Pull = GPIO_NOPULL;     /* 上拉依赖模块板载电阻 */
+        g.Speed = GPIO_SPEED_FREQ_HIGH;
+        g.Alternate = BOARD_OLED_I2C_AF;
+        HAL_GPIO_Init(GPIOB, &g);
+    }
+}
+
+void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
+{
+    if (hi2c->Instance == BOARD_OLED_I2C) {
+        HAL_GPIO_DeInit(BOARD_OLED_I2C_SCL_PORT, BOARD_OLED_I2C_SCL_PIN | BOARD_OLED_I2C_SDA_PIN);
+        __HAL_RCC_I2C1_CLK_DISABLE();
+    }
+}

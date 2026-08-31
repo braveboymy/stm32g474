@@ -56,6 +56,8 @@ add_library(hal STATIC
   ${HAL_DIR}/Src/stm32g4xx_hal_flash_ex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_uart.c
   ${HAL_DIR}/Src/stm32g4xx_hal_uart_ex.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_i2c.c
+  ${HAL_DIR}/Src/stm32g4xx_hal_i2c_ex.c
   ${HAL_DIR}/Src/stm32g4xx_hal_tim.c
   ${HAL_DIR}/Src/stm32g4xx_hal_tim_ex.c
 )
@@ -176,7 +178,10 @@ add_executable(app
   app/tasks/task_demo.c
   app/tasks/task_sysmon.c
   app/tasks/task_wdg.c
+  app/tasks/task_status.c
   app/conn/at.c
+  bsp/oled.c
+  bsp/face_data.c
 )
 target_include_directories(app PRIVATE
   ${CMAKE_SOURCE_DIR}/app

@@ -27,6 +27,18 @@
 /* PA11=USB_DM、PA12=USB_DP 复用 AF10（HAL 头未定义 GPIO_AF10_USB 宏，数值 0x0A） */
 #define BOARD_USB_AF 0x0AU
 
+/* OLED SSD1306 128×64（I2C1：PB8=SCL、PB9=SDA，模块地址 0x3C）
+ * 时序 0x042FBFCF = 400kHz，由 PCLK1=160MHz 按参考手册公式推导：
+ * PRESC=0、SCLDEL=63、SDADEL=63、SCLH=191、SCLL=207；换时钟必须重算 */
+#define BOARD_OLED_I2C I2C1
+#define BOARD_OLED_I2C_AF GPIO_AF4_I2C1
+#define BOARD_OLED_I2C_SCL_PORT GPIOB
+#define BOARD_OLED_I2C_SCL_PIN GPIO_PIN_8
+#define BOARD_OLED_I2C_SDA_PORT GPIOB
+#define BOARD_OLED_I2C_SDA_PIN GPIO_PIN_9
+#define BOARD_OLED_I2C_ADDR (0x3CU)
+#define BOARD_OLED_I2C_TIMING (0x042FBFCFU)
+
 /* IWDG：LSI≈32kHz 标称，但本板实测 ≈96kHz（约 3 倍标称！）→ /64 → 实测 ~1.5kHz；
  * 重载 4095 → 标称 8.2s / 实测 ~2.7s 超时（保守化，喂狗周期 1s）。
  * 换板/量产必须重新实测 LSI（见 .pi/skills/stm32g474-devtools/references/troubleshooting.md 症状表） */

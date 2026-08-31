@@ -34,6 +34,9 @@ int main(void)
     if (osal_task_create("wdg", task_wdg_entry, NULL, 512, 1) == NULL) {
         Error_Handler();
     }
+    if (osal_task_create("st", task_status_entry, NULL, 512, 1) == NULL) {
+        Error_Handler();
+    }
 
     vTaskStartScheduler();
 
