@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# pre-commit 钩子：提交前自动执行 编译 + core 单测 + MISRA（仅本次改动文件）+ clang-format
+# 安装：bash tools/githooks/install_hooks.sh（设置 git core.hooksPath）
+# 跳过（紧急提交）：SKIP_CHECKS=1 git commit ... 或 git commit --no-verify（事后必须补跑检查）
+set -uo pipefail
+
+# tools/githooks/pre-commit -> 项目根
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+DEV=".pi/skills/stm32g474-devtools/scripts/dev.py"
+
+if [ "${SKIP_CHECKS:-0}" = "1" ]; then
+  echo "==> [pre-commit] SKIP_CHECKS=1，跳过编译/单测/MISRA/格式检查"
+  exit 0
+fi
+
+cd "$ROOT" || exit 1
+
+FAILED=0
+
+echo "==> [pre-commit] 编译检查（ninja 增量）"
+if python "$DEV" build > /tmp/precommit_build.log 2>&1; then
+  echo "    ✅ 编译通过"
+else
+  echo "    ❌ 编译失败："
+  tail -20 /tmp/precommit_build.log | sed 's/^/      /'
+  FAILED=1
+fi
+
+echo "==> [pre-commit] core 层 PC 单测"
+if python "$DEV" test > /tmp/precommit_test.log 2>&1; then
+  echo "    ✅ 单测通过"
+else
+  echo "    ❌ 单测失败："
+  tail -20 /tmp/precommit_test.log | sed 's/^/      /'
+  FAILED=1
+fi
+
+echo "==> [pre-commit] MISRA C:2012（仅本次暂存改动的源文件）"
+STAGED_C=$(git diff --cached --name-only --diff-filter=ACM -- '*.c' '*.h' 2>/dev/null)
+# 排除第三方/生成代码/构建产物
+STAGED_C=$(echo "$STAGED_C" | grep -vE "third_party/|bsp/system/|bsp/startup/|bsp/linker/|build/" || true)
+if [ -z "$STAGED_C" ]; then
+  echo "    ⏭️  本次无 C/H 源码改动，跳过"
+elif python "$DEV" misra $STAGED_C > /tmp/precommit_misra.log 2>&1; then
+  echo "    ✅ 无 MISRA 违规"
+else
+  echo "    ❌ MISRA 违规："
+  tail -30 /tmp/precommit_misra.log | sed 's/^/      /'
+  FAILED=1
+fi
+
+echo "==> [pre-commit] clang-format 格式检查（仅改动文件）"
+if command -v clang-format > /dev/null 2>&1; then
+  FILES=$(git diff --cached --name-only --diff-filter=ACM '*.c' '*.h' 2>/dev/null)
+  FILES=$(echo "$FILES" | grep -vE "third_party/|bsp/system/|bsp/startup/|bsp/linker/|bsp/face_data" || true)
+  FMT_FAIL=0
+  for f in $FILES; do
+    [ -f "$f" ] || continue
+    if ! clang-format --style=file --dry-run --Werror "$f" > /dev/null 2>&1; then
+      echo "    ❌ 格式不符: $f（运行 clang-format -i $f）"
+      FMT_FAIL=1
+    fi
+  done
+  if [ "$FMT_FAIL" -eq 0 ]; then
+    echo "    ✅ 格式合规"
+  else
+    FAILED=1
+  fi
+else
+  echo "    ⚠️ 未安装 clang-format，跳过格式检查（建议安装）"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+  echo ""
+  echo "==> [pre-commit] 提交被阻止。处置："
+  echo "    1. 修复上述问题后重新提交"
+  echo "    2. 紧急跳过：SKIP_CHECKS=1 git commit ...（或 git commit --no-verify），事后补跑检查"
+  exit 1
+fi
+
+echo "==> [pre-commit] 全部检查通过"
+exit 0
