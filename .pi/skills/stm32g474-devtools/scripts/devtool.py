@@ -76,6 +76,7 @@ TOOL_PATTERNS = {
     "cmake": [
         "C:/Program Files/CMake/bin/cmake.exe",
         "C:/Program Files (x86)/CMake/bin/cmake.exe",
+        "D:/Tools/cmake-*/bin/cmake.exe",
     ],
     "ninja": [
         "C:/Users/*/AppData/Local/Microsoft/WinGet/Packages/Ninja-build.Ninja*/ninja.exe",
@@ -83,6 +84,7 @@ TOOL_PATTERNS = {
     "arm-none-eabi-gcc": [
         "C:/Program Files (x86)/Arm GNU Toolchain*/*/bin/arm-none-eabi-gcc.exe",
         "C:/Program Files/Arm GNU Toolchain*/*/bin/arm-none-eabi-gcc.exe",
+        "D:/Tools/arm-gcc/*/bin/arm-none-eabi-gcc.exe",
     ],
     "JLink.exe": [
         "C:/Program Files/SEGGER/JLink*/JLink.exe",
